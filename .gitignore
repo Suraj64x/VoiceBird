@@ -1,0 +1,32 @@
+# Python / Node environments and builds
+.venv/
+__pycache__/
+*.pyc
+ui/node_modules/
+ui/dist/
+ui/.npmrc
+
+# Model weights and caches (downloaded on first install)
+models/
+.cache/
+.tmp/
+
+# Your data: voices, projects, settings and generated audio stay on your PC
+voices/
+projects/
+samples/
+words.json
+presets.json
+
+# Engine scratch files, logs and test output
+engines/*/_*
+engines/*/worker.log
+tests/shots/
+tests/.selftest/
+*.log
+
+# Editor / tool state
+.impeccable/
+.claude/
+.DS_Store
+Thumbs.db
