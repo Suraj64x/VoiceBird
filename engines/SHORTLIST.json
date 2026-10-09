@@ -1,0 +1,632 @@
+{
+ "bakeoff": [
+  {
+   "engine": "Chatterbox-Turbo (Resemble AI, 350M) via chatterbox-tts git master",
+   "role": "best-cloning",
+   "device": "cpu (fp32). Loaded fp32 weights are 2.77 GB (est. 3.2-3.6 GB peak) against ~1.4 GB free VRAM on the GTX 1650, so cuda-fp32 does not fit while the desktop is in use. Source has no autocast/half, so there is no fp16 exposure either way. Measured CPU RTF 5.39 on a Ryzen 5 5625U (torch 2.6.0 CPU, 12 threads, built-in voice): a 150-word script (~60 s of audio) should take roughly 5-6 min on the 5600H, inside the 10-minute budget.",
+   "install_steps": "# PowerShell, in an empty folder on the drive that has the free space. Needs Git for Windows on PATH.\n$env:HF_HOME = \"$PWD\\hf-cache\"   # keeps weights on this drive; set the same value before every run\nuv venv --python 3.11 --seed .venv-chatterbox\nuv pip install --python .venv-chatterbox\\Scripts\\python.exe torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cpu\nuv pip install --python .venv-chatterbox\\Scripts\\python.exe \"chatterbox-tts @ git+https://github.com/resemble-ai/chatterbox.git@ab55923c27757c90cfcc407baa57dc25a7d25217\" \"setuptools<81\"\n.venv-chatterbox\\Scripts\\python -c \"from chatterbox.tts_turbo import ChatterboxTurboTTS as T; T.from_pretrained(device='cpu')\"   # 4.04 GB download\n\n# usage (sentence by sentence, reference encoded once; no transcript needed)\nimport torch, torchaudio as ta\nfrom chatterbox.tts_turbo import ChatterboxTurboTTS\ntorch.set_num_threads(6)\nm = ChatterboxTurboTTS.from_pretrained(device=\"cpu\")   # device must be a string\nm.prepare_conditionals(\"ref.wav\")                      # only the first 10-15 s of the clip is used\nfor i, s in enumerate(sentences):\n    torch.manual_seed(0)\n    ta.save(f\"turbo_{i:03}.wav\", m.generate(s), m.sr)   # 24 kHz mono; do NOT pass exaggeration/cfg_weight (ignored with a warning)\n\n# Pins verified today in master pyproject.toml: torch==2.6.0, torchaudio==2.6.0, transformers==5.2.0, numpy<2, diffusers==0.29.0, gradio==6.8.0, librosa==0.11.0, resemble-perth from git master.\n# If uv rejects the transitive git dependency, add it explicitly: \"resemble-perth @ git+https://github.com/resemble-ai/Perth.git@ff1c8ac55a976971245cdd53c18d6131ca00d993\".\n# Optional later add-on in the same venv: Chatterbox-Nano (from_pretrained(device='cpu', nano=True), ~2x slower than realtime on CPU, +3.0 GB). Skip it at first: it pushes the total to ~14.5 GB.",
+   "est_disk_gb": 6,
+   "commercial_ok": true,
+   "licence_summary": "MIT code and MIT weights (HF tag verified). Every output carries Resemble's inaudible PerTh watermark. Clone only your own or a consented voice.",
+   "model_ids": [
+    "ResembleAI/chatterbox-turbo",
+    "ResembleAI/chatterbox-nano (optional, not counted in disk)"
+   ],
+   "risks": "Nothing was installed or run by me. Project is retired (README: 'As of August 2026, Chatterbox is retired research and is no longer maintained'), so pin the commit. The only CPU timing is on a built-in voice, not a clone, and its article is inconsistent about mean vs median. No independent similarity score exists for Turbo itself (family evidence only). Garbles inputs over ~350 chars / 25-30 s, so keep to one sentence per call. Double quotes can be voiced as a sigh; strip them. No speed control, no style prompt; only paralinguistic tags ([chuckle], [laugh], [sigh]...), which are hit-or-miss. The 10 undocumented style tokens ([happy], [narration], [advertisement]...) have conflicting user reports. from_pretrained also pulls an unused 1.06 GB s3gen.safetensors."
+  },
+  {
+   "engine": "Chatterbox original 0.5B (Resemble AI) - same venv and package as Turbo",
+   "role": "best-emotion-or-instruct",
+   "device": "cpu (fp32). 3.19 GB of fp32 weights cannot fit a 4 GB card with 1.4 GB free, and upstream has no fp16 path (which a GTX 1650 could not use safely anyway). CPU speed is UNMEASURED on any comparable machine: it is heavier than Turbo (CFG doubles the batch, 10 decoder steps vs 2), so expect roughly 8-12x slower than realtime, i.e. 8-12 min for 150 words. That sits on the edge of the budget; time one sentence first and drop it if it exceeds ~10x.",
+   "install_steps": "# No new venv: reuse .venv-chatterbox from the Turbo entry.\n$env:HF_HOME = \"$PWD\\hf-cache\"\n.venv-chatterbox\\Scripts\\python -c \"from chatterbox.tts import ChatterboxTTS as T; T.from_pretrained(device='cpu')\"   # 3.19 GB download (t3_cfg + s3gen + ve only)\n\n# usage\nimport torch, torchaudio as ta\nfrom chatterbox.tts import ChatterboxTTS\ntorch.set_num_threads(6)\nm = ChatterboxTTS.from_pretrained(device=\"cpu\")\nfor i, s in enumerate(sentences):\n    torch.manual_seed(0)\n    wav = m.generate(s, audio_prompt_path=\"ref.wav\" if i == 0 else None, exaggeration=0.65, cfg_weight=0.35)\n    ta.save(f\"cbx_{i:03}.wav\", wav, m.sr)\n\n# Starting grid for 'excited but natural host': exaggeration 0.5 / 0.65 / 0.8 crossed with cfg_weight 0.5 / 0.35. README tip: for expressive speech use cfg_weight ~0.3 and exaggeration ~0.7+; higher exaggeration speeds speech up, lower cfg_weight slows it down.",
+   "est_disk_gb": 3.2,
+   "commercial_ok": true,
+   "licence_summary": "MIT code and MIT weights. PerTh watermark in every output.",
+   "model_ids": [
+    "ResembleAI/chatterbox"
+   ],
+   "risks": "The only clean-licence engine that fits this machine and has a numeric emotion control that really applies to a cloned voice, but it is not a free-text instruction and CPU speed is my estimate, not a measurement (web search today found no reproducible CPU figure for the 0.5B model). Occasional runaway generations / trailing hiss until the 1000-token (40 s) cap, and skipped words reported; re-roll the seed per sentence. Extreme exaggeration is unstable. One independent benchmark gave the 0.5B family the best WER (1.2%) and good speaker cosine (0.642) but a low predicted-naturalness score (UTMOS 2.22, fp16 multilingual checkpoint), so listen for naturalness. Unmaintained."
+  },
+  {
+   "engine": "Kyutai Pocket TTS (pocket-tts 4.0.1, default english_2026-10, ~100M)",
+   "role": "fast-fallback",
+   "device": "cpu (fp32). Designed for CPU; official figures are 2.3-2.5x faster than realtime on a 4-vCPU x86 VM, so a 150-word script should take well under a minute. All weights are float32. A CUDA torch build would cost ~4-5 GB of disk for no practical gain.",
+   "install_steps": "$env:HF_HOME = \"$PWD\\hf-cache\"\nuv venv --python 3.11 .venv-small\nuv pip install --python .venv-small\\Scripts\\python.exe torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cpu   # same wheel as the Chatterbox venv, so uv hardlinks it from its cache\nuv pip install --python .venv-small\\Scripts\\python.exe pocket-tts==4.0.1 soundfile\n# MANUAL STEP (you, not the app): accept the terms at https://huggingface.co/kyutai/pocket-tts (gated=auto), then run `uvx hf auth login`. Without this the library silently falls back to the no-cloning weights and only preset voices work.\n\n# usage\nfrom pocket_tts import TTSModel, export_model_state\nimport scipy.io.wavfile\ntts = TTSModel.load_model()                      # temp default 0.3\nvoice = tts.get_state_for_audio_prompt(\"ref.wav\")   # no transcript needed\nexport_model_state(voice, \"my_voice.safetensors\")   # cache the voice\nfor i, s in enumerate(sentences):\n    audio = tts.generate_audio(voice, s)\n    scipy.io.wavfile.write(f\"pocket_{i:03}.wav\", tts.sample_rate, audio.numpy())\n\n# Deps verified today on PyPI: torch>=2.5.0, numpy>=2, python >=3.10,<3.15. Do not install the [quantize] extra (torchao needs a much newer torch).",
+   "est_disk_gb": 1.5,
+   "commercial_ok": true,
+   "licence_summary": "MIT code, CC-BY-4.0 weights (HF tag verified, gated=auto). Commercial use allowed with attribution: put 'Voice generated with Pocket TTS by Kyutai (CC BY 4.0)' in the video description. Model card prohibits cloning a voice without the speaker's consent.",
+   "model_ids": [
+    "kyutai/pocket-tts"
+   ],
+   "risks": "100M-class model: users report prosody below Kokoro's and occasional repeated or inserted words (issues #347, #221, #115). No emotion, style or speed control at all; delivery follows the reference clip. 24 kHz output. Reverb/noise in the reference is reproduced, so denoise the clip. One Windows report of garbled cloning from a 24 kHz reference fixed by resampling the reference to 16 kHz. Not on any arena, so quality is by ear only. The 1.3 GB 24-layer English preview (english_2026-09_24l) is a possible quality upgrade I did not research."
+  },
+  {
+   "engine": "Sopro v2 Turbo (samuel-vitorino, 120M) - shares the Pocket TTS venv",
+   "role": "fast-fallback (second lightweight cloning contender)",
+   "device": "cpu (fp32). Author figure is RTF 0.24 on an Apple M3 CPU; no x86 number exists but it should stay faster than realtime on the 5600H. Its ~0.63 GB of fp32 weights would also fit the 1.4 GB of free VRAM, but that needs a separate ~4-5 GB CUDA torch install and is not worth the disk.",
+   "install_steps": "# Reuse .venv-small from the Pocket TTS entry.\nuv pip install --python .venv-small\\Scripts\\python.exe \"sopro==2.2.0\"   # must be 2.2.0: every earlier release is yanked as incompatible with the current weights (verified on PyPI today)\n\n# usage (weights auto-download, not gated, no transcript needed)\nfrom sopro import SoproTTS\ntts = SoproTTS.from_pretrained(\"samuel-vitorino/sopro-v2-turbo\", device=\"cpu\")\nfor i, s in enumerate(sentences):\n    wav = tts.synthesize(s, ref_audio_path=\"ref.wav\")   # 5-20 s reference recommended; 20 s is the top of the range\n    tts.save_wav(f\"sopro_{i:03}.wav\", wav)\n\n# CLI knobs: --steps (default 2; try 8/16/32 for better similarity), --temperature, --top-p, --top-k, --int8. Local demo: `soprotts serve`.",
+   "est_disk_gb": 0.8,
+   "commercial_ok": true,
+   "licence_summary": "Apache-2.0 code and weights (PyPI and HF tag verified). No watermark, no gate, no revenue cap.",
+   "model_ids": [
+    "samuel-vitorino/sopro-v2-turbo"
+   ],
+   "risks": "Only author-run metrics (Seed-TTS test-en WER 1.63, SIM 0.655 at 2 steps, 0.685 at 32 steps); no arena entry and no independent listening test I could open. Minimal text frontend: spell out numbers, abbreviations and symbols. No emotion or speed control and no documented seed. Single-maintainer project; a reviewer reported quality dropping near the end of long samples (second-hand). If it loses clearly to Pocket TTS in the first listen, delete it and spend the slot on the ZONOS3-Mini-hf smoke test (see excluded/reserve list)."
+  }
+ ],
+ "can_share_one_venv": "Two venvs, not one. (1) .venv-chatterbox holds Chatterbox-Turbo, Chatterbox original and optionally Nano: one package with hard pins torch==2.6.0, torchaudio==2.6.0, transformers==5.2.0, numpy<2, gradio==6.8.0, diffusers==0.29.0 (verified in master pyproject.toml today). (2) .venv-small holds Pocket TTS and Sopro: pocket-tts requires numpy>=2, which directly conflicts with Chatterbox's numpy<2, so the four cannot be merged; Sopro (torch>=2.3, numpy>=1.24) is compatible with either and sits with Pocket TTS. Both venvs install the identical torch==2.6.0+cpu / torchaudio==2.6.0+cpu wheels from https://download.pytorch.org/whl/cpu, so uv hardlinks them from its cache and torch exists on disk once, provided the uv cache and the venvs are on the same drive (otherwise uv copies, costing about 1 GB extra). Total footprint about 11.5 GB (venvs ~2.0 + ~1.3 GB worst case, weights 4.04 + 3.19 + 0.22 + 0.63-0.95 GB); adding Chatterbox-Nano (+3.0 GB) would reach ~14.5 GB. Reserve engines: ZONOS3-Mini-hf (transformers>=4.57, torch, no numpy pin) could probably be added to .venv-small, untested; Qwen3-TTS (transformers==4.57.3, accelerate==1.12.0), NeuTTS (transformers==5.1.0), VoxCPM (funasr/modelscope/torchcodec), IndexTTS (torch 2.8 cu128, transformers 4.52.1) and CosyVoice (torch 2.3.1, transformers 4.51.3) each need their own venv.",
+ "excluded": [
+  {
+   "engine": "ZONOS3-Mini (Zyphra) - RESERVE 1",
+   "reason": "Not excluded on merit; held back because it is three days old. Re-checked today: the two research entries contradicted each other. Resolution: Zyphra/ZONOS3-Mini-hf does exist (created 2026-11-11, Apache-2.0 weights, transformers remote code ported from the MIT ZONOS3 repo, install is `pip install \"transformers>=4.57\" torch soundfile`), so there IS a pip path on Windows, but its README lists 'steering controls and accents' as not included, so the emotion steering is native-runtime only (ggml build needs CMake + MSVC + Rust, no release binaries). No CPU speed figure anywhere, no independent quality data, trust_remote_code on day-old code. Do a 10-minute CPU smoke test in .venv-small (2.39 GB) if Sopro disappoints; promote if RTF is under ~3."
+  },
+  {
+   "engine": "Qwen3-TTS-12Hz-0.6B-Base (official qwen-tts) - RESERVE 2",
+   "reason": "Apache-2.0 and top naturalness, but GPU is out (fp32 OOMs on 4 GB, fp16 crashes, bf16 needs ~2.3 GB) and CPU is 4.5-5.8x slower than realtime on a 16-core 7950X, so roughly 6-10x on the 5600H: at or over the 10-minute budget for 150 words. Also lowest speaker similarity in the one independent benchmark (cosine 0.491), no instruct on clones, needs a transcript and its own venv (transformers==4.57.3). Try CPU-only (2.5 GB) only if all four bake-off engines sound unnatural."
+  },
+  {
+   "engine": "VoxCPM 1.5 / VoxCPM-0.5B (OpenBMB) - RESERVE 3",
+   "reason": "Apache-2.0 with the best published similarity, but needs 5-6 GB VRAM and on CPU measures 3.6-7.5x slower than realtime on an i5-12600K (GGUF), so about 5-10x here in PyTorch; the faster 0.5B outputs only 16 kHz, which is poor for YouTube narration. Heavy Windows install (funasr, modelscope, torchcodec + FFmpeg, Triton workaround, own venv). Overnight-batch fallback only."
+  },
+  {
+   "engine": "Chatterbox-Nano (110M)",
+   "reason": "Not a separate install: optional add-on to the Chatterbox venv (nano=True, MIT, ~2x slower than realtime on a 6-core Ryzen, 2.5 GB RAM). Left out of the first round because its cloning quality is unverified and expected below Turbo, Pocket TTS and Sopro already cover the fast role, and its 3.0 GB download would push the total past ~14 GB."
+  },
+  {
+   "engine": "NeuTTS Air (Neuphonic)",
+   "reason": "Apache-2.0 and CPU-realtime, but lowest-tier measured speaker similarity (47.5% on Seed-TTS vs 67-73 for Base-size models), 30 s context that includes the reference (a 20 s clip leaves ~10 s), exact transcript required, gated repos, and a transformers==5.1.0 pin that forces a third venv."
+  },
+  {
+   "engine": "NeuTTS Nano",
+   "reason": "Same limits as Air with even lower similarity (40.2%) and a custom revenue-capped licence."
+  },
+  {
+   "engine": "MOSS-TTS-Nano 100M",
+   "reason": "Apache-2.0 and fast on CPU, but the issue tracker shows inconsistent loudness, repeated words, dropped sentences and multi-second gaps in clone output, which is exactly what breaks long narration; install is clone-from-git with a pynini/WeTextProcessing dependency to sidestep on Windows. Agent-grade, not narration-grade."
+  },
+  {
+   "engine": "KittenTTS 2",
+   "reason": "Has an [excited] tag, but nothing confirms tags work together with reference= cloning (re-checked the card today: the emotion example uses a preset voice and the feature is beta). CPU speed has no published figure, GPU path wants ~8 GB, the dependency tree is large, and the Stellon Labs Community License is revocable and asks commercial users to register. Revisit only if exaggeration on Chatterbox is not enough."
+  },
+  {
+   "engine": "Silencio-2 (BlueRoseLabs)",
+   "reason": "116 MB Pocket-TTS-18M fine-tune with emotion tags and CC-BY-4.0, but 12 days old, zero published evaluation, 18M-class quality ceiling, and unconfirmed that tags hold on a cloned voice. Optional toy test in .venv-small, not a candidate."
+  },
+  {
+   "engine": "Qwen3-TTS-12Hz-1.7B-Base",
+   "reason": "4.54 GB, ~8 GB in fp32, cannot fit the GPU in any safe dtype and is slower on CPU than the already-borderline 0.6B."
+  },
+  {
+   "engine": "Qwen3-TTS CustomVoice / VoiceDesign",
+   "reason": "Cannot clone a user reference voice; the only instruct-capable variants are the 1.7B ones, too large here."
+  },
+  {
+   "engine": "Qwen3-TTS 0.6B via third-party GGUF runtimes (HaujetZhao, qwentts.cpp, gabriele-mastrapasqua)",
+   "reason": "Only route where Qwen3 might fit (author-claimed ~1.3 GB VRAM / RTF 1.3 on CPU) but requires self-exporting models with a Chinese-only README, hand-placed llama.cpp DLLs, an fp16 DirectML decoder (the unsafe dtype on GTX 16xx) and has a ~30 s context limit; the other runtimes are WSL/Linux only. Too much manual work for unverified claims."
+  },
+  {
+   "engine": "IndexTTS-2.5",
+   "reason": "Best emotion/speed controls on a cloned voice, but ~6 GB VRAM in bf16 (more in fp32), no measured CPU speed, 16-18 GB of the 20 GB disk, and a custom bilibili licence whose application to monetized output is unconfirmed. Revisit with an 8 GB+ GPU."
+  },
+  {
+   "engine": "IndexTTS-2",
+   "reason": "Real-world VRAM 10-12 GB with OOM reports on 8 and 12 GB cards, ~17-18 GB disk, no speed control, same licence uncertainty."
+  },
+  {
+   "engine": "IndexTTS-1.5",
+   "reason": "Licence conflict: the v1.5.0 repo's INDEX_MODEL_LICENSE restricts weights to non-commercial use without written authorization, contradicting the Apache-2.0 HF tag. Also no emotion or speed control."
+  },
+  {
+   "engine": "Chatterbox Multilingual V3",
+   "reason": "Same 3.2 GB footprint and speed as the original 0.5B with no benefit for English-only narration."
+  },
+  {
+   "engine": "Chatterbox-Flash",
+   "reason": "Throughput model whose speed depends on FlashInfer in bf16; no Windows or CPU evidence; 3.2 GB fp32."
+  },
+  {
+   "engine": "DramaBox (Resemble)",
+   "reason": "8.55 GB with a 6.58 GB diffusion transformer, non-MIT LTX-2 community licence with unverified commercial terms."
+  },
+  {
+   "engine": "Fun-CosyVoice3-0.5B-2512",
+   "reason": "Apache-2.0 and has inference_instruct2 on a cloned voice, but ~3.44 GB of fp32 weights on GPU (fp16 flag is autocast-only), CPU evidence points far beyond budget, even an RTX 4090 on Windows ran at RTF 1.4-3.3, fragile pins (torch 2.3.1, transformers 4.51.3) and ~12 GB of disk. Instruction list is mostly fixed Chinese strings."
+  },
+  {
+   "engine": "CosyVoice2-0.5B",
+   "reason": "~2.56 GB fp32 weights vs 1.4 GB free VRAM, no CPU speed evidence, older and lower-similarity model that upstream tells users to replace."
+  },
+  {
+   "engine": "F5-TTS v1 Base (official)",
+   "reason": "CC-BY-NC-4.0 weights: not usable for monetized videos. Also auto-fp16 silent-output bug on GTX 16xx."
+  },
+  {
+   "engine": "OpenF5-TTS-Base",
+   "reason": "Apache-2.0 but self-described alpha and 'inferior to the official NC model', 5.4 GB checkpoint (11-12 GB with env), CPU 6-25x slower than realtime, and the GPU path needs most of the 4 GB free plus an fp32 workaround with mixed success on GTX 1650."
+  },
+  {
+   "engine": "SILMA TTS v1",
+   "reason": "Official package blocked on Windows by pynini/NeMo; loading through stock f5-tts is untested; 150M size class with no independent English evidence; reference clipped to ~8 s."
+  },
+  {
+   "engine": "E2 TTS Base",
+   "reason": "CC-BY-NC-4.0 weights."
+  },
+  {
+   "engine": "F5-TTS / E2 TTS Small configs",
+   "reason": "No official Small checkpoint exists; nothing to install."
+  },
+  {
+   "engine": "Fish Audio Drama 3",
+   "reason": "48 GB+ VRAM, Linux/WSL only, tens of GB of weights."
+  },
+  {
+   "engine": "Fish Audio S2-Pro",
+   "reason": "Research/non-commercial licence, 24 GB VRAM floor, 11 GB download."
+  },
+  {
+   "engine": "OpenAudio S1-mini",
+   "reason": "CC-BY-NC-SA-4.0 weights; unmaintained, needs a pinned old commit and officially 12 GB VRAM."
+  },
+  {
+   "engine": "Higgs TTS 3 (4B)",
+   "reason": "Licence allows monetized creator content with credit, but the smallest quant is 4.09 GB needing ~8 GB VRAM, no CPU mode, no Python API, no official Windows path."
+  },
+  {
+   "engine": "Higgs Audio v2 (3B)",
+   "reason": "18-24 GB VRAM (about 8 GB even at 4-bit, slower than realtime), bf16 hardcoded, 12 GB of disk."
+  },
+  {
+   "engine": "Higgs Audio v2.5 (1B)",
+   "reason": "No open weights; hosted API only."
+  },
+  {
+   "engine": "LuxTTS",
+   "reason": "Technically ideal (fp32, <1 GB VRAM, 48 kHz) but it is a distillation of ZipVoice, whose authors declared the weights CC-BY-NC on 2026-10-10; the Apache-2.0 label is disputed, so not safe for a monetized channel. User-reported cloning fidelity is also mixed."
+  },
+  {
+   "engine": "ZipVoice / ZipVoice-Distill",
+   "reason": "CC-BY-NC weights since the 2026-10-10 model-card update."
+  },
+  {
+   "engine": "OmniVoice (k2-fsa)",
+   "reason": "CC-BY-NC weights. Popular, but do not let that pull it into the app."
+  },
+  {
+   "engine": "VoxCPM2",
+   "reason": "The only model here with real free-text style control on a cloned voice, but ~8 GB VRAM and far too slow on a 6-core CPU (RTF ~1.76 even on an M4 Pro with Metal)."
+  },
+  {
+   "engine": "KokoClone (Kokoro + Kanade voice conversion)",
+   "reason": "Not true zero-shot cloning: Kokoro's stock prosody with approximate timbre conversion; needs Python 3.12; hobby project with no evaluation."
+  },
+  {
+   "engine": "Supertonic / Supertonic 3",
+   "reason": "No local voice cloning in the open release; repo archived."
+  },
+  {
+   "engine": "Zonos v0.1",
+   "reason": "6 GB+ VRAM, no official Windows support, superseded by ZONOS3-Mini."
+  },
+  {
+   "engine": "Spark-TTS",
+   "reason": "CC-BY-NC-SA-4.0 weights."
+  },
+  {
+   "engine": "MegaTTS3",
+   "reason": "WaveVAE encoder withheld, so arbitrary voices cannot be cloned locally; pynini via conda on Windows."
+  },
+  {
+   "engine": "OuteTTS 1.0",
+   "reason": "Unmaintained since May 2025, rigid pins with a compiled llama-cpp-python, too slow on CPU, stronger 1B checkpoint is non-commercial."
+  },
+  {
+   "engine": "Dia 1.6B / Dia2",
+   "reason": "~7.9 GB in fp32 (4.4 GB in the half precision this card cannot use), no CPU path, dialogue model."
+  },
+  {
+   "engine": "Sesame CSM-1B",
+   "reason": "6.2 GB fp32 model, GPU-only, double gating, conversational base model rather than a narrator cloner."
+  },
+  {
+   "engine": "Audio8-TTS-Realistic-Air 0.6B",
+   "reason": "Ships for BF16 GPUs, ~2.4 GB+ in fp32, no CPU speed evidence, needs exact transcript, no controls, and its arena entry was suspended for vote manipulation so there is no trustworthy quality signal."
+  },
+  {
+   "engine": "Ming-3.0-tts-0.5B",
+   "reason": "MIT with emotion/speed/pitch task modes usable with a reference, but 3 GB checkpoint that does not fit free VRAM in fp32, no CPU or small-GPU speed data at all (tested only on H800/H20), old transformers==4.46.3 pin, modes cannot be combined. Speculative on this machine."
+  },
+  {
+   "engine": "Breeze TTS 2",
+   "reason": "Non-commercial weights, 3B model needing 7.7+ GiB VRAM, Linux only."
+  },
+  {
+   "engine": "Voxtral TTS (4B)",
+   "reason": "CC BY-NC weights, 16 GB VRAM, vLLM/Linux serving, preset voices only in the open release."
+  },
+  {
+   "engine": "Gradium Phonon 31M / 40M",
+   "reason": "No zero-shot cloning in the open weights (preset voices only); 40M is non-commercial."
+  },
+  {
+   "engine": "Confucius4-TTS",
+   "reason": "~3 GB CUDA-only stack with heavy pins, no CPU or low-VRAM evidence, no independent quality data."
+  },
+  {
+   "engine": "dots.tts",
+   "reason": "2B BF16 model, ~8-9 GB in fp32, no CPU path."
+  },
+  {
+   "engine": "FireRedTTS3",
+   "reason": "8.5 GB checkpoints plus a 3.8 GB autoencoder: too big for VRAM and disk."
+  },
+  {
+   "engine": "Maya 2 Native",
+   "reason": "~8 GB VRAM, Linux only, Indic-language focus, cloning described as approximate."
+  },
+  {
+   "engine": "audio.cpp (runtime, not a model)",
+   "reason": "Not an engine. Keep in mind as a 31 MB prebuilt Windows fallback runner (use the CPU-portable build; the 5600H has no AVX-512) if a Python install fails; per-model CPU speed is unmeasured and converted models may differ in quality."
+  }
+ ],
+ "licence_table": [
+  {
+   "engine": "Chatterbox-Turbo",
+   "code": "MIT",
+   "weights": "MIT",
+   "commercial_ok": true
+  },
+  {
+   "engine": "Chatterbox original 0.5B",
+   "code": "MIT",
+   "weights": "MIT",
+   "commercial_ok": true
+  },
+  {
+   "engine": "Chatterbox-Nano",
+   "code": "MIT",
+   "weights": "MIT (HF tag verified today)",
+   "commercial_ok": true
+  },
+  {
+   "engine": "Chatterbox Multilingual V3",
+   "code": "MIT",
+   "weights": "MIT",
+   "commercial_ok": true
+  },
+  {
+   "engine": "Chatterbox-Flash",
+   "code": "MIT",
+   "weights": "MIT",
+   "commercial_ok": true
+  },
+  {
+   "engine": "DramaBox (Resemble)",
+   "code": "not checked",
+   "weights": "LTX-2 Community License (commercial terms unverified)",
+   "commercial_ok": false
+  },
+  {
+   "engine": "Kyutai Pocket TTS",
+   "code": "MIT",
+   "weights": "CC-BY-4.0 (attribution required; gated=auto)",
+   "commercial_ok": true
+  },
+  {
+   "engine": "Sopro v2 Turbo",
+   "code": "Apache-2.0",
+   "weights": "Apache-2.0",
+   "commercial_ok": true
+  },
+  {
+   "engine": "ZONOS3-Mini / ZONOS3-Mini-hf",
+   "code": "MIT (runtimes repo; -hf remote code ported from it)",
+   "weights": "Apache-2.0",
+   "commercial_ok": true
+  },
+  {
+   "engine": "Zonos v0.1",
+   "code": "Apache-2.0",
+   "weights": "Apache-2.0",
+   "commercial_ok": true
+  },
+  {
+   "engine": "Qwen3-TTS-12Hz-0.6B-Base",
+   "code": "Apache-2.0",
+   "weights": "Apache-2.0",
+   "commercial_ok": true
+  },
+  {
+   "engine": "Qwen3-TTS-12Hz-1.7B-Base",
+   "code": "Apache-2.0",
+   "weights": "Apache-2.0",
+   "commercial_ok": true
+  },
+  {
+   "engine": "Qwen3-TTS CustomVoice / VoiceDesign",
+   "code": "Apache-2.0",
+   "weights": "Apache-2.0 (family-level; individual cards not opened)",
+   "commercial_ok": true
+  },
+  {
+   "engine": "Qwen3-TTS GGUF runtimes (HaujetZhao, qwentts.cpp, etc.)",
+   "code": "MIT",
+   "weights": "Apache-2.0 (converted official weights)",
+   "commercial_ok": true
+  },
+  {
+   "engine": "IndexTTS-2.5",
+   "code": "bilibili Model Use License Agreement (custom)",
+   "weights": "bilibili Model Use License Agreement; commercial under 100M MAU / revenue threshold, application to monetized output not officially confirmed",
+   "commercial_ok": true
+  },
+  {
+   "engine": "IndexTTS-2",
+   "code": "bilibili Model Use License Agreement (custom)",
+   "weights": "bilibili Model Use License Agreement; same caveats, not officially confirmed",
+   "commercial_ok": true
+  },
+  {
+   "engine": "IndexTTS-1.5",
+   "code": "Apache-2.0 at v1.5.0 tag",
+   "weights": "Conflicting: HF tag Apache-2.0 vs INDEX_MODEL_LICENSE non-commercial without written authorization",
+   "commercial_ok": false
+  },
+  {
+   "engine": "Fun-CosyVoice3-0.5B-2512",
+   "code": "Apache-2.0",
+   "weights": "Apache-2.0 (card has an 'academic purposes' disclaimer about page content)",
+   "commercial_ok": true
+  },
+  {
+   "engine": "CosyVoice2-0.5B",
+   "code": "Apache-2.0",
+   "weights": "Apache-2.0 (maintainer: 'it supports commercial use')",
+   "commercial_ok": true
+  },
+  {
+   "engine": "F5-TTS v1 Base",
+   "code": "MIT",
+   "weights": "CC-BY-NC-4.0",
+   "commercial_ok": false
+  },
+  {
+   "engine": "OpenF5-TTS-Base",
+   "code": "MIT",
+   "weights": "Apache-2.0",
+   "commercial_ok": true
+  },
+  {
+   "engine": "SILMA TTS v1",
+   "code": "MIT",
+   "weights": "Apache-2.0 (training data undisclosed)",
+   "commercial_ok": true
+  },
+  {
+   "engine": "E2 TTS Base",
+   "code": "MIT",
+   "weights": "CC-BY-NC-4.0",
+   "commercial_ok": false
+  },
+  {
+   "engine": "F5-TTS / E2 TTS Small configs",
+   "code": "MIT",
+   "weights": "none released",
+   "commercial_ok": false
+  },
+  {
+   "engine": "Fish Audio Drama 3",
+   "code": "Fish Audio Community License v1.0",
+   "weights": "Fish Audio Community License v1.0 (commercial under USD 500k annual revenue)",
+   "commercial_ok": true
+  },
+  {
+   "engine": "Fish Audio S2-Pro",
+   "code": "Fish Audio Community License (current main)",
+   "weights": "Fish Audio Research License (non-commercial)",
+   "commercial_ok": false
+  },
+  {
+   "engine": "OpenAudio S1-mini",
+   "code": "Apache at S1-era commit",
+   "weights": "CC-BY-NC-SA-4.0",
+   "commercial_ok": false
+  },
+  {
+   "engine": "Higgs TTS 3 (4B)",
+   "code": "Apache-2.0 (boson-ai/higgs-audio)",
+   "weights": "Boson research/non-commercial licence with Creator Use Grant (monetized creator content allowed with credit line)",
+   "commercial_ok": true
+  },
+  {
+   "engine": "Higgs Audio v2 (3B)",
+   "code": "Apache-2.0",
+   "weights": "Boson Higgs Audio 2 Community License (commercial under 100k annual active users)",
+   "commercial_ok": true
+  },
+  {
+   "engine": "Higgs Audio v2.5 (1B)",
+   "code": "Apache-2.0 (repo)",
+   "weights": "not released (API only)",
+   "commercial_ok": false
+  },
+  {
+   "engine": "NeuTTS Air",
+   "code": "Repo LICENSE is NeuTTS Open License v1.0; README table says Apache-2.0",
+   "weights": "Apache-2.0 (gated=auto; Perth watermark)",
+   "commercial_ok": true
+  },
+  {
+   "engine": "NeuTTS Nano",
+   "code": "NeuTTS Open License v1.0",
+   "weights": "NeuTTS Open License 1.0 (commercial under USD 5M annual revenue)",
+   "commercial_ok": true
+  },
+  {
+   "engine": "LuxTTS",
+   "code": "Apache-2.0",
+   "weights": "Tagged Apache-2.0 but distilled from ZipVoice, now declared CC-BY-NC upstream: disputed",
+   "commercial_ok": false
+  },
+  {
+   "engine": "ZipVoice / ZipVoice-Distill",
+   "code": "Apache-2.0",
+   "weights": "CC-BY-NC",
+   "commercial_ok": false
+  },
+  {
+   "engine": "OmniVoice",
+   "code": "Apache-2.0",
+   "weights": "CC-BY-NC",
+   "commercial_ok": false
+  },
+  {
+   "engine": "VoxCPM 1.5 / VoxCPM-0.5B",
+   "code": "Apache-2.0",
+   "weights": "Apache-2.0",
+   "commercial_ok": true
+  },
+  {
+   "engine": "VoxCPM2",
+   "code": "Apache-2.0",
+   "weights": "Apache-2.0",
+   "commercial_ok": true
+  },
+  {
+   "engine": "KokoClone (Kokoro-82M + Kanade)",
+   "code": "Apache-2.0 (KokoClone), MIT (kanade-tokenizer)",
+   "weights": "Kokoro Apache-2.0, Kanade MIT (WavLM-base+ has no licence tag)",
+   "commercial_ok": true
+  },
+  {
+   "engine": "Supertonic / Supertonic 3",
+   "code": "MIT",
+   "weights": "OpenRAIL-M (use restrictions; no cloning)",
+   "commercial_ok": true
+  },
+  {
+   "engine": "Spark-TTS",
+   "code": "Apache-2.0",
+   "weights": "CC-BY-NC-SA-4.0",
+   "commercial_ok": false
+  },
+  {
+   "engine": "MegaTTS3",
+   "code": "Apache-2.0",
+   "weights": "Apache-2.0 (WaveVAE encoder withheld)",
+   "commercial_ok": true
+  },
+  {
+   "engine": "OuteTTS 1.0",
+   "code": "Apache-2.0",
+   "weights": "0.6B Apache-2.0; 1B CC-BY-NC-SA-4.0",
+   "commercial_ok": true
+  },
+  {
+   "engine": "Dia 1.6B / Dia2",
+   "code": "Apache-2.0",
+   "weights": "Apache-2.0",
+   "commercial_ok": true
+  },
+  {
+   "engine": "Sesame CSM-1B",
+   "code": "Apache-2.0",
+   "weights": "Apache-2.0 (gated; needs gated Llama-3.2-1B too)",
+   "commercial_ok": true
+  },
+  {
+   "engine": "MOSS-TTS-Nano 100M",
+   "code": "Apache-2.0",
+   "weights": "Apache-2.0",
+   "commercial_ok": true
+  },
+  {
+   "engine": "KittenTTS 2",
+   "code": "Apache-2.0",
+   "weights": "Stellon Labs Community License (commercial under USD 1M revenue and funding; registration requested; revocable)",
+   "commercial_ok": true
+  },
+  {
+   "engine": "Silencio-2",
+   "code": "MIT",
+   "weights": "CC-BY-4.0 (attribution; fine-tune of Pocket TTS)",
+   "commercial_ok": true
+  },
+  {
+   "engine": "Audio8-TTS-Realistic-Air 0.6B",
+   "code": "Apache-2.0",
+   "weights": "Apache-2.0",
+   "commercial_ok": true
+  },
+  {
+   "engine": "Ming-3.0-tts-0.5B",
+   "code": "MIT",
+   "weights": "MIT",
+   "commercial_ok": true
+  },
+  {
+   "engine": "Breeze TTS 2",
+   "code": "Apache-2.0",
+   "weights": "BreezeBlue research and non-commercial licence",
+   "commercial_ok": false
+  },
+  {
+   "engine": "Voxtral TTS (4B)",
+   "code": "n/a (vLLM-Omni)",
+   "weights": "CC-BY-NC-4.0",
+   "commercial_ok": false
+  },
+  {
+   "engine": "Gradium Phonon 31M / 40M",
+   "code": "MIT OR Apache-2.0",
+   "weights": "31M Apache-2.0 (no cloning); 40M CC-BY-NC-4.0",
+   "commercial_ok": true
+  },
+  {
+   "engine": "Confucius4-TTS",
+   "code": "Apache-2.0 (LICENSE file not opened)",
+   "weights": "Apache-2.0",
+   "commercial_ok": true
+  },
+  {
+   "engine": "dots.tts",
+   "code": "Apache-2.0",
+   "weights": "Apache-2.0",
+   "commercial_ok": true
+  },
+  {
+   "engine": "FireRedTTS3",
+   "code": "Apache-2.0",
+   "weights": "Apache-2.0 (card adds an 'academic research' usage disclaimer)",
+   "commercial_ok": true
+  },
+  {
+   "engine": "Maya 2 Native",
+   "code": "Apache-2.0",
+   "weights": "Apache-2.0 (Mimi codec CC-BY-4.0)",
+   "commercial_ok": true
+  },
+  {
+   "engine": "audio.cpp (runtime)",
+   "code": "Apache-2.0",
+   "weights": "n/a: each GGUF keeps its original model licence",
+   "commercial_ok": true
+  }
+ ],
+ "open_questions": [
+  "Nothing was installed or run: every speed, VRAM and disk figure is from sources or my arithmetic. First action after install should be timing one 15-word sentence per engine on the actual 5600H.",
+  "Speed threshold: the research entries judged CPU feasibility against a '3x slower than realtime' limit, but the stated rule is ~10 minutes for a 150-word script (~60 s of audio), i.e. about 10x. I re-scored against 10x, which is why Chatterbox-Turbo (measured 5.39x on a Ryzen 5 5625U) is in and why Chatterbox original is in conditionally.",
+  "Chatterbox original 0.5B CPU speed is unmeasured. My 8-12x estimate straddles the budget; a web search today found only an unsourced blog claim of '5-10x slower' on CPU (codersera.com) and no reproducible number. If it exceeds ~10x, the emotion slot has no fitting engine and falls back to the reference-clip method below.",
+  "No engine that fits this machine accepts a free-text instruction ('excited but natural, friendly YouTube host') on a cloned voice. VoxCPM2, IndexTTS-2.5, CosyVoice3 and Breeze TTS 2 do, and all are excluded on hardware or licence. Practical route: record a second 15-20 s reference clip in the excited host delivery and use it with every engine (all four copy prosody from the reference), plus exaggeration/cfg_weight on Chatterbox original. Is recording a second reference acceptable?",
+  "Is the reference voice the user's own or a consented speaker? Pocket TTS's model card prohibits cloning without consent, and consent is outside every licence listed.",
+  "Pocket TTS cloning weights are gated: the user must accept the terms on Hugging Face and run `uvx hf auth login` themselves. Without it the library silently loads the no-cloning weights.",
+  "Are the mandatory PerTh watermark in every Chatterbox output and the CC-BY attribution line for Pocket TTS in each video description acceptable?",
+  "Do the 10 undocumented Chatterbox-Turbo style tokens ([happy], [narration], [advertisement], [dramatic]...) do anything on a cloned voice under the PyTorch backend? Reports conflict (issues #492 vs #557); cheap to test with a fixed seed.",
+  "GPU experiment worth it? With the desktop apps closed, Chatterbox-Nano (est. 2.2-2.5 GB fp32) might fit the GTX 1650 and Turbo (est. 3.2-3.6 GB) might barely fit, but that needs a separate torch 2.6.0+cu124 install (2.53 GB download, roughly 4-5 GB on disk) and nobody has reported it working on a 4 GB card. Not in the plan; would break the ~14 GB cap unless Chatterbox original is dropped.",
+  "Which drive holds the ~20 GB free? HF_HOME, the uv cache and both venvs should be on that same drive so torch is hardlinked once and weights do not land on C: by default.",
+  "Chatterbox is retired upstream since August 2026 (README notice verified today): acceptable to build an app on a pinned, unmaintained commit? Also unverified: whether uv accepts the transitive git dependency on resemble-perth without listing it explicitly (a third-party log shows uv 0.12.5 installing it on Windows 11).",
+  "Disk saver, untested: download ResembleAI/chatterbox-turbo with `hf download --exclude s3gen.safetensors` and load via ChatterboxTurboTTS.from_local(dir, 'cpu') to save 1.06 GB (same for Nano). I did not confirm from_local never touches that file.",
+  "Sopro has no documented seed and only author-run metrics; ZONOS3-Mini-hf has no CPU speed data. Both should be re-checked in a few weeks for independent reviews, and ZONOS3-Mini for Windows release binaries that would unlock its emotion steering on cloned voices.",
+  "A/B protocol not defined here: suggest the same 150-word script and the same reference clip for all four, loudness-normalised to the same LUFS, filenames shuffled for the blind listen, and generation time logged per engine."
+ ]
+}

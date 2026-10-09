@@ -1,0 +1,40 @@
+[
+ {
+  "engine": "Sopro v2 Turbo (samuel-vitorino/sopro)",
+  "repo_url": "https://github.com/samuel-vitorino/sopro",
+  "hf_model_ids": [
+   "samuel-vitorino/sopro-v2-turbo"
+  ],
+  "latest_version": "sopro-v2-turbo; PyPI sopro 2.2.0 (2026-09-01, all earlier 2.x releases yanked as incompatible with current weights). HF repo created 2026-08-25, last modified 2026-10-06. Author blog post dated 2026-08-27.",
+  "code_license": "Apache-2.0 (LICENSE.txt, PyPI metadata)",
+  "weights_license": "apache-2.0 (HF license tag)",
+  "commercial_ok": true,
+  "commercial_notes": "Apache-2.0 for code and weights, no revenue cap or attribution clause beyond Apache notice. Training data listed as Emilia YODAS, LibriTTS-R, FalAR; the author still licenses the weights Apache-2.0. No watermark.",
+  "params": "120M (distilled from a 0.5B teacher). AR transformer -> flow-matching mel head (2 steps default) -> causal Vocos vocoder. English, European Portuguese, French, German.",
+  "download_size_gb": "~0.63 GB needed (model.safetensors 486 MB F32 + semantic_encoder 82 MB + vocoder 54 MB + speaker_encoder 11 MB). Whole repo 0.95 GB because it also holds a 318 MB f16 GGUF.",
+  "vram_gb_min": "Not stated officially. Weights are F32 and total ~0.63 GB, so my estimate is well under 1.5 GB in fp32; should fit even the ~1.4 GB free budget, but this is unverified on a GTX 1650.",
+  "fits_4gb_gpu": true,
+  "cpu_feasible": true,
+  "speed_note": "Author figures (GitHub README, HF card, blog): 0.24 RTF offline / 0.21 RTF streaming on an Apple M3 CPU, ~300 ms time-to-first-audio; 0.07 RTF on H100. No Ryzen number published; a 5600H should still be faster than realtime. --int8 flag gives int8 AR weights on CPU.",
+  "python_versions": ">=3.10 (PyPI requires_python); 3.11 fine.",
+  "windows_install": "uv pip install torch torchaudio (any build >=2.3; CPU wheels are enough) then `uv pip install -U sopro` (must be >=2.2.0). Wheel is pure Python (py3-none-any); deps: torch>=2.3, torchaudio>=2.3, numpy>=1.24, safetensors, sentencepiece, soundfile, huggingface_hub. No espeak, pynini, flash-attn or compiler needed. README/HF card say nothing about Windows either way (no stated blocker, no stated support). Local demo: `soprotts serve` (http://localhost:7860).",
+  "needs_ref_transcript": false,
+  "instruct_on_cloned_voice": "No. There is no style/emotion/instruct input; delivery follows the reference clip. Only sampling controls.",
+  "emotion_controls": "None.",
+  "speed_control": "None documented. Controls: --temperature, --top-p, --top-k, --steps (default 2; 8/16/32 may help on hard references), --max-seconds per segment, --lang, --int8, --stream. No seed option documented.",
+  "minimal_python_usage": "from sopro import SoproTTS\n\ntts = SoproTTS.from_pretrained(\"samuel-vitorino/sopro-v2-turbo\", device=\"cpu\")\n\nwav = tts.synthesize(\n    \"Hello! This is a non-streaming Sopro TTS example.\",\n    ref_audio_path=\"ref.wav\",\n)\n\ntts.save_wav(\"out.wav\", wav)",
+  "cloning_quality_note": "Only author-run metrics exist: Seed-TTS test-en WER 1.63 / SIM 0.655 at 2 steps (0.685 at 32 steps; ground truth 0.734); MiniMax English WER 1.98 / SIM 0.715. Not on TTS Arena V2 or Artificial Analysis. Independent evidence is thin and second-hand (search summary of an instasd.com review I could not open, HTTP 403): reviewer rated it above Pocket TTS on similarity but below on cleanness; Reddit commenters still preferred Qwen3-TTS / IndexTTS2 on quality. Reference clip 5-20 s recommended, so a 20 s clip is at the top of the range.",
+  "known_issues": "Minimal text frontend: numbers, abbreviations and symbols may be mispronounced (spell them out). Mixed-language text is weak. Streaming path is not bit-exact with offline. A reviewer reported quality dropping near the end of long samples (second-hand). Single-maintainer project, GitHub Releases empty, no training code.",
+  "verdict": "shortlist",
+  "verdict_reason": "Best fit for this machine among the new 2026 releases: Apache-2.0 code and weights, 120M params, real-time on CPU, no reference transcript, plain `pip install sopro` with no Windows-hostile dependencies, ~0.6 GB on disk. Weak points are lack of any emotion/speed control and no independent quality ranking, so it needs an A/B listen against the larger engines.",
+  "sources": [
+   "https://huggingface.co/samuel-vitorino/sopro-v2-turbo",
+   "https://github.com/samuel-vitorino/sopro",
+   "https://pypi.org/pypi/sopro/json",
+   "https://raw.githubusercontent.com/samuel-vitorino/sopro/main/pyproject.toml",
+   "https://research.haloneuro.ai/posts/sopro-v2",
+   "https://huggingface.co/api/models/samuel-vitorino/sopro-v2-turbo?blobs=true",
+   "https://www.instasd.com/post/sopro-v2-turbo-comfyui-voice-cloning"
+  ]
+ }
+]

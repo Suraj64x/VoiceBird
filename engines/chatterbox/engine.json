@@ -1,0 +1,14 @@
+{
+ "name": "Chatterbox (most expressive)",
+ "licence": "MIT",
+ "commercial": true,
+ "note": "Most natural and expressive clone with a real emotion-strength control. Uses the graphics card; takes about 4 seconds per second of audio.",
+ "style": false,
+ "max_chars": 280,
+ "merge_under": 0,
+ "order": 20,
+ "emotion": true,
+ "match": 4,
+ "speed": 2,
+ "rtf": 4.0
+}

@@ -1,0 +1,13 @@
+{
+ "name": "Chatterbox Nano (fast)",
+ "licence": "MIT",
+ "commercial": true,
+ "note": "Quick, good clone. Runs on the graphics card, faster than real time. No emotion-strength control (only [laugh]/[sigh]-style tags typed in the text).",
+ "style": false,
+ "max_chars": 250,
+ "merge_under": 0,
+ "order": 10,
+ "match": 4,
+ "speed": 5,
+ "rtf": 0.6
+}

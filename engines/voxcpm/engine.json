@@ -1,0 +1,13 @@
+{
+ "name": "VoxCPM (closest voice match)",
+ "licence": "Apache-2.0",
+ "commercial": true,
+ "note": "Copies voice, accent and pacing very closely. Uses the graphics card; takes about 4 seconds per second of audio. No emotion controls.",
+ "style": false,
+ "max_chars": 220,
+ "merge_under": 25,
+ "order": 30,
+ "match": 3,
+ "speed": 2,
+ "rtf": 2.5
+}

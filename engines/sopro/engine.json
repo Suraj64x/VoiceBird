@@ -1,0 +1,13 @@
+{
+ "name": "Sopro (tiny, CPU only)",
+ "licence": "Apache-2.0",
+ "commercial": true,
+ "note": "Small clone that runs on the processor only, about real-time speed. No emotion or style controls.",
+ "style": false,
+ "max_chars": 250,
+ "merge_under": 0,
+ "order": 40,
+ "match": 2,
+ "speed": 4,
+ "rtf": 1.0
+}

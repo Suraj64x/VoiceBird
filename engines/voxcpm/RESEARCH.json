@@ -1,0 +1,80 @@
+[
+ {
+  "engine": "VoxCPM 1.5 / VoxCPM-0.5B (OpenBMB)",
+  "latest_version": "voxcpm 2.0.3 on PyPI (2026-05-11) loads all generations. VoxCPM1.5 released 2025-12 (0.8B, 44.1 kHz); VoxCPM-0.5B released 2025-09 (16 kHz). HF repos last touched 2026-11-09.",
+  "repo_url": "https://github.com/OpenBMB/VoxCPM",
+  "hf_model_ids": [
+   "openbmb/VoxCPM1.5",
+   "openbmb/VoxCPM-0.5B",
+   "bluryar/VoxCPM-GGUF"
+  ],
+  "params": "VoxCPM1.5: 0.8B (README also says 0.6B backbone); VoxCPM-0.5B: 0.5-0.6B",
+  "code_license": "Apache-2.0",
+  "weights_license": "Apache-2.0 (HF tags on both repos; README: 'Weights and code released under the Apache-2.0 license, free for commercial use')",
+  "commercial_ok": true,
+  "commercial_notes": "Apache-2.0 for code and weights, not gated. The 1.5 model card still carries a research-oriented caution about production use without testing.",
+  "vram_gb_min": "Official FAQ: ~5 GB (0.5B), ~6 GB (1.5). Does not fit 4 GB, let alone 1.4 GB free.",
+  "fits_4gb_gpu": false,
+  "cpu_feasible": false,
+  "speed_note": "Official: RTF ~0.17 (0.5B) / ~0.15 (1.5) on RTX 4090 with torch.compile. FAQ: 'CPU: Works out of the box, but inference is slow'. Community GGUF benchmark (VoxCPM.cpp, i5-12600K, 8 threads), full-pipeline RTF: 0.5B Q4_K 3.61, Q8_0 3.87, F32 5.26; 1.5 Q8_0 4.29, F32 7.49. A Ryzen 5 5600H will be somewhat slower, i.e. roughly 4-8x slower than realtime.",
+  "download_size_gb": "1.95 (VoxCPM1.5) / 1.61 (0.5B); GGUF Q4_K 0.58 / 0.48",
+  "python_versions": ">=3.10,<3.13 (most tested 3.10-3.11)",
+  "windows_install": "uv venv --python 3.11; uv pip install voxcpm (torch>=2.5, torchaudio, torchcodec, funasr, modelscope, gradio>=6, datasets<4: heavy). Windows blockers from the official FAQ: Triton import errors / 'Python int too large to convert to C long' -> load with optimize=False (or install triton-windows matching torch: 2.6->3.2, 2.7->3.3, 2.8->3.4); torchaudio>=2.9 needs torchcodec + FFmpeg on PATH for reference audio. CPU: VoxCPM.from_pretrained(..., device='cpu', optimize=False). The faster GGUF route (VoxCPM.cpp) is a CMake source build with no Windows binaries.",
+  "needs_ref_transcript": true,
+  "instruct_on_cloned_voice": "No for 1.x (continuation cloning only; control instructions are a VoxCPM2 feature).",
+  "emotion_controls": "None explicit; style is inferred from text and prompt. cfg_value (2.0), inference_timesteps (10; 4-30), seed, normalize, denoise, retry_badcase / retry_badcase_max_times / retry_badcase_ratio_threshold.",
+  "speed_control": "None in 1.x.",
+  "minimal_python_usage": "import soundfile as sf\nfrom voxcpm import VoxCPM\nmodel = VoxCPM.from_pretrained(\"openbmb/VoxCPM1.5\", device=\"cpu\", optimize=False, load_denoiser=False)\nwav = model.generate(text=\"Text to speak.\", prompt_wav_path=\"ref.wav\", prompt_text=\"Exact transcript of ref.wav.\", cfg_value=2.0, inference_timesteps=10)\nsf.write(\"out.wav\", wav, model.tts_model.sample_rate)",
+  "cloning_quality_note": "Best published similarity in this group. Seed-TTS test-en (VoxCPM README table): VoxCPM-0.5B WER 1.85 / SIM 72.9; VoxCPM1.5 WER 2.12 / SIM 71.4 (F5-TTS 2.00 / 67.0; IndexTTS2 2.23 / 70.6). Mostly self-reported; the 0.5B paper was accepted at ICLR 2026. Not in TTS Arena V2.",
+  "known_issues": "Too much VRAM for this card; slow on CPU. Long inputs can speed up or buzz (docs say split into short segments). 0.5B outputs only 16 kHz. Mismatched prompt transcript is the most common cause of bad 1.x output. Issue #112 asks for fp16 support on older hardware (open).",
+  "verdict": "maybe",
+  "verdict_reason": "Highest cloning similarity with a clean Apache-2.0 licence, but it fails both hardware tests here (5-6 GB VRAM; 4-8x slower than realtime on CPU). Keep only as an overnight batch-render fallback if the small engines do not sound close enough.",
+  "sources": [
+   "https://github.com/OpenBMB/VoxCPM",
+   "https://raw.githubusercontent.com/OpenBMB/VoxCPM/main/README.md",
+   "https://voxcpm.readthedocs.io/en/latest/_sources/faq.rst.txt",
+   "https://voxcpm.readthedocs.io/en/latest/_sources/usage_guide.rst.txt",
+   "https://huggingface.co/openbmb/VoxCPM1.5",
+   "https://huggingface.co/api/models/openbmb/VoxCPM-0.5B?blobs=true",
+   "https://pypi.org/project/voxcpm/",
+   "https://huggingface.co/bluryar/VoxCPM-GGUF",
+   "https://github.com/OpenBMB/VoxCPM/issues/67",
+   "https://github.com/OpenBMB/VoxCPM/issues/105"
+  ]
+ },
+ {
+  "engine": "VoxCPM2 (OpenBMB)",
+  "latest_version": "VoxCPM2 released 2026-04 (HF created 2026-04-03); package voxcpm 2.0.3 (2026-05-11)",
+  "repo_url": "https://github.com/OpenBMB/VoxCPM",
+  "hf_model_ids": [
+   "openbmb/VoxCPM2"
+  ],
+  "params": "2B",
+  "code_license": "Apache-2.0",
+  "weights_license": "Apache-2.0 (HF tag)",
+  "commercial_ok": true,
+  "commercial_notes": "README: 'Fully Open-Source & Commercial-Ready'.",
+  "vram_gb_min": "~8 GB (official)",
+  "fits_4gb_gpu": false,
+  "cpu_feasible": false,
+  "speed_note": "RTF ~0.30 on RTX 4090; llama.cpp-omni Q8_0 GGUF RTF ~1.76 on an Apple M4 Pro with Metal, so a 6-core laptop CPU would be far slower than 3x realtime.",
+  "download_size_gb": "4.96",
+  "python_versions": ">=3.10,<3.13",
+  "windows_install": "uv pip install voxcpm (same Triton/torchcodec caveats as VoxCPM 1.5). Not usable on this hardware.",
+  "needs_ref_transcript": false,
+  "instruct_on_cloned_voice": "Yes: 'Controllable Voice Cloning' - put a free-text instruction in parentheses before the text together with reference_wav_path, e.g. text='(slightly faster, cheerful tone)...'. Ignored in transcript-based 'Ultimate Cloning' mode. Results vary run to run (docs suggest 1-3 tries).",
+  "emotion_controls": "Free-text style/emotion/pace instruction, cfg_value, inference_timesteps, seed.",
+  "speed_control": "Via the text instruction only.",
+  "minimal_python_usage": "from voxcpm import VoxCPM\nimport soundfile as sf\nmodel = VoxCPM.from_pretrained(\"openbmb/VoxCPM2\", load_denoiser=False)\nwav = model.generate(text=\"(calm, warm narration)Text to speak.\", reference_wav_path=\"ref.wav\", cfg_value=2.0, inference_timesteps=10, seed=42)\nsf.write(\"out.wav\", wav, model.tts_model.sample_rate)",
+  "cloning_quality_note": "Seed-TTS test-en WER 1.84 / SIM 75.3 (own table). 48 kHz output.",
+  "known_issues": "8 GB VRAM; controllable cloning is not deterministic.",
+  "verdict": "exclude",
+  "verdict_reason": "The only model in this group with real free-text style control on a cloned voice, but it needs ~8 GB VRAM and is far too slow on a 6-core CPU.",
+  "sources": [
+   "https://raw.githubusercontent.com/OpenBMB/VoxCPM/main/README.md",
+   "https://voxcpm.readthedocs.io/en/latest/_sources/faq.rst.txt",
+   "https://voxcpm.readthedocs.io/en/latest/_sources/usage_guide.rst.txt",
+   "https://huggingface.co/api/models/openbmb/VoxCPM2?blobs=true"
+  ]
+ }
+]
