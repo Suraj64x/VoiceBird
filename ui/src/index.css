@@ -1,0 +1,152 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "@fontsource-variable/bricolage-grotesque";
+@import "@fontsource-variable/outfit";
+@import "@fontsource-variable/geist-mono";
+
+@custom-variant dark (&:is(.dark *));
+
+/* A studio tool: near-black panes with a faint green cast, hairline borders, 6px corners.
+   Green is the action colour; every area has its own hue (voice violet, files blue, delivery amber,
+   pace cyan, consistency pink) used for its icon tile and its sliders.
+   Bricolage Grotesque for titles and numbers, Outfit for the interface, Geist Mono for time. */
+:root {
+  --page: #eef2f0;
+  --header: #ffffff;
+  --background: #ffffff;
+  --foreground: #0f1714;
+  --card: #ffffff;
+  --card-foreground: #0f1714;
+  --popover: #ffffff;
+  --popover-foreground: #0f1714;
+  --primary: #22c55e;
+  --primary-foreground: #04200f;
+  --secondary: #f1f5f3;
+  --secondary-foreground: #0f1714;
+  --muted: #f1f5f3;
+  --muted-foreground: #55655e;
+  --accent: #e4ebe7;
+  --accent-foreground: #0f1714;
+  --destructive: #d1242f;
+  --border: #d5ddd9;
+  --input: #bcc8c2;
+  --ring: #16a34a;
+  /* hues */
+  --green: #15803d;
+  --cyan: #0891b2;
+  --blue: #2563eb;
+  --violet: #7c3aed;
+  --pink: #db2777;
+  --amber: #c2700a;
+  --red: #d1242f;
+  --slate: #55655e;
+  --hue: var(--green);
+}
+.dark {
+  --page: #080b0a;
+  --header: #0a0e0d;
+  --background: #0d1211;
+  --foreground: #ecf2ef;
+  --card: #0d1211;
+  --card-foreground: #ecf2ef;
+  --popover: #141b19;
+  --popover-foreground: #ecf2ef;
+  --primary: #2fdb73;
+  --primary-foreground: #03140a;
+  --secondary: #18201e;
+  --secondary-foreground: #ecf2ef;
+  --muted: #141a18;
+  --muted-foreground: #93a39c;
+  --accent: #1c2522;
+  --accent-foreground: #f4f8f6;
+  --destructive: #ff6b66;
+  --border: #212a27;
+  --input: #303c38;
+  --ring: #2fdb73;
+  --green: #3ddc84;
+  --cyan: #3fd4e6;
+  --blue: #6aa7ff;
+  --violet: #b197fc;
+  --pink: #f783c0;
+  --amber: #fbbf3c;
+  --red: #ff6b66;
+  --slate: #93a39c;
+}
+/* an area sets its hue once; tiles, sliders and switches inside pick it up */
+.hue-green { --hue: var(--green); }
+.hue-cyan { --hue: var(--cyan); }
+.hue-blue { --hue: var(--blue); }
+.hue-violet { --hue: var(--violet); }
+.hue-pink { --hue: var(--pink); }
+.hue-amber { --hue: var(--amber); }
+.hue-red { --hue: var(--red); }
+.hue-slate { --hue: var(--slate); }
+
+@theme inline {
+  --font-sans: "Outfit Variable", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --font-display: "Bricolage Grotesque Variable", "Outfit Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --color-page: var(--page);
+  --color-header: var(--header);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-success: var(--green);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-hue: var(--hue);
+  --color-hue-soft: color-mix(in oklab, var(--hue) 16%, transparent);
+  /* boxy: every corner is 6px (4px for the small bits) */
+  --radius-xs: 3px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 6px;
+  --radius-xl: 6px;
+  --radius-2xl: 6px;
+}
+
+@layer base {
+  * { @apply border-border outline-ring/50; scrollbar-width: thin; scrollbar-color: var(--input) transparent; }
+  html { color-scheme: light; }
+  html.dark { color-scheme: dark; }
+  html, body, #root { height: 100%; }
+  body { @apply bg-page text-foreground font-sans antialiased; font-size: 15px; }
+  ::selection { background: color-mix(in oklab, var(--primary) 35%, transparent); }
+  input, textarea { caret-color: var(--green); }
+  button:not(:disabled), [role="button"], [role="slider"], label:has(input[type="file"]) { cursor: pointer; }
+}
+
+/* sliders and switches take the colour of the area they sit in */
+[class*="hue-"] [data-slot="slider-range"],
+[class*="hue-"] [data-slot="switch"][data-state="checked"] { background: var(--hue); }
+[class*="hue-"] [data-slot="slider-thumb"] { border-color: var(--hue); }
+
+/* thin seek bar (native range, restyled) for clips without a drawn waveform */
+.seek { appearance: none; height: 4px; border-radius: 2px; background: var(--input); cursor: pointer; }
+.seek::-webkit-slider-thumb { appearance: none; width: 10px; height: 10px; border-radius: 2px; background: var(--green); }
+.seek::-moz-range-thumb { width: 10px; height: 10px; border: 0; border-radius: 2px; background: var(--green); }
+
+/* the one moving part: little level bars while a paragraph is being spoken */
+@keyframes level { 0%, 100% { transform: scaleY(0.3); } 50% { transform: scaleY(1); } }
+.levels { display: inline-flex; align-items: center; gap: 2px; height: 14px; }
+.levels i { width: 3px; height: 100%; border-radius: 1px; background: var(--green); transform-origin: center; animation: level 0.9s ease-in-out infinite; }
+.levels i:nth-child(2) { animation-delay: -0.3s; }
+.levels i:nth-child(3) { animation-delay: -0.6s; }
+@media (prefers-reduced-motion: reduce) { .levels i { animation: none; transform: scaleY(0.6); } }
+
+/* panels: the scrollbar only shows while the pointer is over it */
+.quiet-scroll { scrollbar-gutter: stable; scrollbar-color: transparent transparent; transition: scrollbar-color 0.2s; }
+.quiet-scroll:hover, .quiet-scroll:focus-within { scrollbar-color: var(--input) transparent; }
