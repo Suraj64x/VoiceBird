@@ -1,0 +1,14 @@
+{
+ "name": "Qwen3 (closest match)",
+ "licence": "Apache-2.0",
+ "commercial": true,
+ "note": "Continues your voice sample, so it copies voice, pace and delivery closely at 24 kHz; uses the graphics card, about 2 seconds per second of audio, no emotion controls.",
+ "style": false,
+ "emotion": false,
+ "max_chars": 300,
+ "merge_under": 0,
+ "order": 5,
+ "match": 5,
+ "speed": 3,
+ "rtf": 2.0
+}

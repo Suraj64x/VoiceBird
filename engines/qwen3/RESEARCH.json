@@ -1,0 +1,22 @@
+{
+ "pick": "Qwen/Qwen3-TTS-12Hz-0.6B-Base (official qwen-tts 0.1.1, pinned)",
+ "checked": "2026-11-13",
+ "licence": "Apache-2.0 code and weights (HF tag + repo); not gated; no watermark mentioned anywhere",
+ "why": "In-context cloning (sample audio codes + exact transcript), so timbre, pace and delivery follow the sample. 24 kHz output. Fits the disk (2.52 GB weights) and the GPU (~2.8 GB incl. CUDA context) and runs at ~1.9 s per second of audio on the GTX 1650 after the fixes in worker.py. On Jason it beat Chatterbox-Nano on similarity (0.87 vs 0.82) and matched the sample's pace best (4.36 vs 4.23 words/s).",
+ "gtx16xx_fixes": "fp16 overflows to inf in the code predictor's MLP (down_proj) -> that 5-layer part runs in fp32; its 15 sub-steps per frame are replayed as one CUDA graph (RTF 4.4 -> 1.9); only 25 sample frames are decoded as context. bf16 is never used.",
+ "rejected": {
+  "Fun-CosyVoice3-0.5B-2512": "9.75 GB repo (fp32 llm/flow/onnx files), ~3.4 GB fp32 on GPU: does not fit 2.9 GB of usable disk or the VRAM",
+  "VoxCPM1.5": "fits (1.95 GB) and 44.1 kHz, but same family as the installed VoxCPM, lower published similarity than 0.5B and bigger/slower on this card",
+  "IndexTTS-2": "bilibili custom licence (monetized use unconfirmed), 10-12 GB VRAM, ~17 GB disk",
+  "k2-fsa/OmniVoice": "3.27 GB of weights (over the disk budget) and no licence tag on the HF repo",
+  "ZipVoice / LuxTTS": "small and fast, but lower published similarity than Qwen3 / VoxCPM",
+  "VoxCPM2, Higgs, Fish S2, dots.tts (2B), Miso 8B": "8 GB+ VRAM or non-commercial"
+ },
+ "sources": [
+  "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-Base",
+  "https://github.com/QwenLM/Qwen3-TTS",
+  "https://huggingface.co/api/models/FunAudioLLM/Fun-CosyVoice3-0.5B-2512?blobs=true",
+  "https://huggingface.co/api/models/k2-fsa/OmniVoice?blobs=true",
+  "https://huggingface.co/api/models/openbmb/VoxCPM1.5?blobs=true"
+ ]
+}
