@@ -12,27 +12,28 @@ if not errorlevel 1 (
 )
 
 if not exist ".venv\Scripts\python.exe" (
-  echo The Python environment is missing. See README.md, section "Reinstall".
+  echo VoiceBird is missing some of its files. Run installer\setup.ps1, or "Repair VoiceBird" from the Start menu.
   pause
   exit /b 1
 )
 
-rem Build the screen once, and again only after it was changed (a built screen loads much faster).
+rem Build the screen once, and again only after it was changed (an installed copy ships it built).
+if not exist "ui\src" goto run
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$d = Get-Item 'ui\dist\index.html' -ErrorAction SilentlyContinue; $s = Get-ChildItem 'ui\src','ui\index.html' -Recurse -File | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if (-not $d -or $s.LastWriteTime -gt $d.LastWriteTime) { exit 1 }"
+if not errorlevel 1 goto run
+where node >nul 2>&1
 if errorlevel 1 (
-  where node >nul 2>&1
-  if errorlevel 1 (
-    echo Node.js is needed once to prepare the screen. Get it from https://nodejs.org and run this again.
-    pause
-    exit /b 1
-  )
-  echo Preparing the screen, about 20 seconds...
-  pushd ui
-  if not exist node_modules call npm install --no-audit --no-fund
-  call npm run build
-  popd
+  echo Node.js is needed once to prepare the screen. Get it from https://nodejs.org and run this again.
+  pause
+  exit /b 1
 )
+echo Preparing the screen, about 20 seconds...
+pushd ui
+if not exist node_modules call npm install --no-audit --no-fund
+call npm run build
+popd
 
+:run
 rem Open the browser as soon as the app answers.
 start "" /b powershell -NoProfile -WindowStyle Hidden -Command "for ($i = 0; $i -lt 240; $i++) { try { (New-Object Net.Sockets.TcpClient('127.0.0.1', 7878)).Close(); Start-Process 'http://localhost:7878'; break } catch { Start-Sleep -Milliseconds 500 } }"
 

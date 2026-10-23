@@ -285,6 +285,8 @@ def transcribe(path, words: bool = False) -> list[dict]:
     wav, out = tmp(), tmp("")
     try:
         convert(path, wav, sr=16000, extra=("-c:a", "pcm_s16le"))
+        if not (WHISPER and WHISPER_MODEL):
+            raise RuntimeError("Speech recognition (Whisper) is not installed. Run 'Repair VoiceBird' from the Start menu.")
         args = [WHISPER, "-m", WHISPER_MODEL, "-f", str(wav), "-oj", "-of", str(out), "-np", "-l", "en",
                 "-t", str(min(8, os.cpu_count() or 4)), "-mc", "0"]  # no carried context: one slip can't drop the rest
         if words:

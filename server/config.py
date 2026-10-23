@@ -1,4 +1,4 @@
-"""Paths and environment. Imported first so every cache lands on D: (C: is nearly full)."""
+"""Paths and environment. Imported first so every model and cache stays inside the app folder."""
 import os
 import shutil
 from pathlib import Path
@@ -18,16 +18,24 @@ os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
 os.environ["TEMP"] = os.environ["TMP"] = str(TMP)
 
 
-def _find(env: str, name: str, *guesses: str) -> str:
+def _find(env: str, name: str, *guesses: str, required: bool = True) -> str:
     for c in (os.environ.get(env), shutil.which(name), *guesses):
         if c and Path(c).exists():
             return str(c)
-    raise RuntimeError(f"{name} not found. Set the {env} environment variable to its full path.")
+    if required:
+        raise RuntimeError(f"{name} not found. Run 'Repair VoiceBird', or set {env} to its full path.")
+    return ""
 
 
+# Installed copies live in runtime/ (the installer puts them there); a dev setup can use PATH or the guesses.
+RUNTIME = ROOT / "runtime"
 _WINGET = Path.home() / "AppData/Local/Microsoft/WinGet/Packages"
-FFMPEG = _find("VOICECLONER_FFMPEG", "ffmpeg", *map(str, _WINGET.glob("Gyan.FFmpeg*/ffmpeg-*/bin/ffmpeg.exe")))
-# whisper.cpp already lives in this workspace (used by the video editor); reuse it.
+FFMPEG = _find("VOICECLONER_FFMPEG", "ffmpeg", str(RUNTIME / "ffmpeg/ffmpeg.exe"),
+               *map(str, _WINGET.glob("Gyan.FFmpeg*/ffmpeg-*/bin/ffmpeg.exe")))
+# Whisper (transcripts, subtitles) is optional at start: the app still runs and says what is missing when it is needed.
 _WHISPER_DIR = ROOT.parent / "whisper.cpp"
-WHISPER = _find("VOICECLONER_WHISPER", "whisper-cli", str(_WHISPER_DIR / "build/bin/whisper-cli.exe"))
-WHISPER_MODEL = _find("VOICECLONER_WHISPER_MODEL", "ggml-medium.en.bin", str(_WHISPER_DIR / "ggml-medium.en.bin"))
+WHISPER = _find("VOICECLONER_WHISPER", "whisper-cli", str(RUNTIME / "whisper/whisper-cli.exe"),
+                str(_WHISPER_DIR / "build/bin/whisper-cli.exe"), required=False)
+WHISPER_MODEL = _find("VOICECLONER_WHISPER_MODEL", "ggml-medium.en.bin",
+                      *(str(d / f"ggml-{m}.en.bin") for m in ("medium", "small", "base") for d in (RUNTIME / "whisper", _WHISPER_DIR)),
+                      required=False)

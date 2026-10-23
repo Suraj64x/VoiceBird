@@ -30,3 +30,11 @@ tests/.selftest/
 .claude/
 .DS_Store
 Thumbs.db
+
+# Installer build output and the app's own downloads
+installer/build/
+installer/dist/
+installer/art/
+runtime/
+.broken/
+logs/

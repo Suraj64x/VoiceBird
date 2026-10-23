@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import NumberFlow from '@number-flow/react';
-import { ArrowsClockwise, Check, CircleNotch, ClockCounterClockwise, FileArrowUp, DownloadSimple, Equalizer, Faders, FileAudio, FileText, Files, FolderOpen, IconContext, Moon, Playlist, Stop, Subtitles, Sun, TextAa, Trash, Waveform, YoutubeLogo } from '@phosphor-icons/react';
+import { ArrowsClockwise, Check, CircleNotch, ClockCounterClockwise, FileArrowUp, Power, DownloadSimple, Equalizer, Faders, FileAudio, FileText, Files, FolderOpen, IconContext, Moon, Playlist, Stop, Subtitles, Sun, TextAa, Trash, Waveform, YoutubeLogo } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -104,6 +104,7 @@ export default function App() {
   const [project, setProject] = useState<Project | null>(null);
   const [voiceDlg, setVoiceDlg] = useState(false);
   const [ask, setAsk] = useState<Ask | null>(null);
+  const [quit, setQuit] = useState(false);
   const [rename, setRename] = useState<Rename | null>(null);
   const [crop, setCrop] = useState<CropTarget | null>(null);
   const [moodFor, setMoodFor] = useState<string | null>(null);
@@ -351,6 +352,11 @@ export default function App() {
           <Button variant="ghost" size="icon" className="size-8" onClick={toggleTheme} aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'} title={dark ? 'Light mode' : 'Dark mode'}>
             {dark ? <Sun /> : <Moon />}
           </Button>
+          <Button variant="ghost" size="icon" className="size-8 text-muted-foreground hover:text-destructive" aria-label="Quit VoiceBird" title="Quit VoiceBird"
+            onClick={() => setAsk({ title: 'Quit VoiceBird?', body: 'It stops running on this PC. Open it again from the desktop or Start menu.', yes: 'Quit',
+              run: () => { api.post('/quit').catch(() => {}); setQuit(true); } })}>
+            <Power weight="bold" />
+          </Button>
         </header>
 
         <div className="grid min-h-0 flex-1 lg:grid-cols-[272px_minmax(0,1fr)_320px]">
@@ -538,6 +544,15 @@ export default function App() {
         </Dialog>
 
         <MoodDialog voice={voices.find((v) => v.id === moodFor) ?? null} onClose={() => setMoodFor(null)} onChanged={loadVoices} />
+        {quit && (
+          <div className="fixed inset-0 z-[100] grid place-items-center bg-page/95 p-6 text-center backdrop-blur-sm">
+            <div className="grid justify-items-center gap-3">
+              <span className="grid size-12 place-items-center rounded-md bg-primary text-primary-foreground"><Waveform className="size-7" /></span>
+              <p className="font-display text-2xl font-extrabold tracking-tight">VoiceBird is closed</p>
+              <p className="text-sm text-muted-foreground">You can close this tab. Open VoiceBird again from the desktop or Start menu.</p>
+            </div>
+          </div>
+        )}
         <Toaster theme={dark ? 'dark' : 'light'} position="top-center" richColors />
       </div>
     </IconContext.Provider>

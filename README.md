@@ -50,16 +50,26 @@ Free, unlimited, and 100% on your own PC.
 
 ## Quick start
 
-You need Windows 10 or 11, Python 3.11, Node 20+ and FFmpeg. An NVIDIA graphics card with 4 GB is recommended; the processor works too, just slower.
+**Install.** Run **`VoiceBird-Setup.exe`** from [Releases](https://github.com/Suraj64x/VoiceBird/releases) on Windows 10 or 11. Pick your voice engines, and setup installs everything else: Python, FFmpeg, speech recognition and the voice models. It checks each part as it goes. You don't need admin rights.
+
+**Open** VoiceBird from the desktop or the Start menu. It runs in your browser at **http://localhost:7878**, with no extra window to keep open. **Quit** from the power button in the top bar.
+
+**Fix** anything that breaks with **Repair VoiceBird** in the Start menu, or by running the installer again. It reinstalls only what is missing or broken, and moves an unreadable settings file aside instead of deleting it. Your voices and projects are always kept.
+
+An NVIDIA graphics card with 4 GB is recommended, and setup finds it on its own. The processor works too, just slower.
+
+<details>
+<summary>Build from source</summary>
 
 ```bash
 git clone https://github.com/Suraj64x/VoiceBird
-cd VoiceBird
+cd VoiceBird/ui && npm install && npm run build && node ../installer/art.mjs
+powershell -ExecutionPolicy Bypass -File ../installer/build.ps1
 ```
 
-Set up the app and at least one engine as described in the [guide](docs/GUIDE.md#reinstall), then double-click **`start.bat`**. VoiceBird opens at **http://localhost:7878**.
+This needs Node 20+, [uv](https://github.com/astral-sh/uv) and [Inno Setup](https://jrsoftware.org/isinfo.php). The installer lands in `installer/dist/`. To set up a working copy in place instead, run `installer/setup.ps1 -Mode install`.
 
-> A one-click installer is on the way.
+</details>
 
 ## Engines
 

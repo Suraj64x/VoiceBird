@@ -4,6 +4,7 @@ Everything is stored as plain files: voices/<id>/, projects/<id>/ (project.json,
 from . import config  # noqa: F401  (first: points every cache at D:)
 
 import json
+import os
 import random
 import re
 
@@ -674,6 +675,16 @@ def status():
     return {"device": engines.device(), "loading": engines.loading, "job": _public(JOB),
             "engines": [{k: e[k] for k in ("id", "name", "licence", "commercial", "note", "style", "emotion", "match", "speed", "rtf")} for e in es],
             "defaultEngine": es[0]["id"] if es else ""}
+
+
+@app.post("/api/quit")
+def quit_app():
+    """Stop VoiceBird (it runs without a window when started from the shortcut)."""
+    def bye():
+        engines.shutdown()
+        os._exit(0)
+    threading.Timer(0.4, bye).start()
+    return {"ok": True}
 
 
 @app.post("/api/job/cancel")
