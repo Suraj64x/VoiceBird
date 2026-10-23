@@ -9,6 +9,7 @@
       // set the theme before first paint (no flash)
       const t = localStorage.theme || 'dark';
       document.documentElement.classList.toggle('dark', t === 'dark');
+      document.documentElement.style.setProperty('--ui-zoom', +localStorage.uiZoom || 1); // interface size
     </script>
   </head>
   <body>

@@ -150,3 +150,7 @@
 /* panels: the scrollbar only shows while the pointer is over it */
 .quiet-scroll { scrollbar-gutter: stable; scrollbar-color: transparent transparent; transition: scrollbar-color 0.2s; }
 .quiet-scroll:hover, .quiet-scroll:focus-within { scrollbar-color: var(--input) transparent; }
+
+/* interface size: the app and everything that pops out of it (menus, dialogs, toasts). Menus position
+   themselves from the zoomed buttons, so only their contents are zoomed, never the positioned wrapper. */
+#root, [data-radix-popper-content-wrapper] > *, [data-slot="dialog-content"], [data-sonner-toaster] { zoom: var(--ui-zoom, 1); }

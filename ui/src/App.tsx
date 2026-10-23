@@ -17,6 +17,7 @@ import { VoiceDialog } from '@/components/VoiceDialog';
 import { MoodDialog } from '@/components/MoodDialog';
 import { Words } from '@/components/Words';
 import { History } from '@/components/History';
+import { UiScale } from '@/components/UiScale';
 import { cn } from '@/lib/utils';
 
 /** A stable function that always calls the latest version (keeps memoised rows from re-rendering). */
@@ -346,6 +347,7 @@ export default function App() {
           <span className="flex h-7 items-center gap-2 rounded-md border px-2.5 text-xs font-medium text-muted-foreground" title="Everything runs on this PC">
             <span className={cn('size-2 rounded-full', state[1] === 'ok' ? 'bg-success' : 'animate-pulse bg-[var(--amber)]')} />{state[0]}
           </span>
+          <UiScale />
           <Button variant="ghost" size="icon" className="size-8" onClick={toggleTheme} aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'} title={dark ? 'Light mode' : 'Dark mode'}>
             {dark ? <Sun /> : <Moon />}
           </Button>
