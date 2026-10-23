@@ -171,30 +171,23 @@ const shots = {};
 // ---------- handwritten notes ----------
 // [rect, side of the image the note sits on, text, tilt (deg), vertical/horizontal nudge]
 const NOTES = {
-  app: { k: 0.62, pad: { l: 440, r: 440, t: 110, b: 50 }, notes: [
-    ['voice', 'left', 'your cloned voices', -3],
-    ['player', 'top', 'keeps playing as you click around', -2],
-    ['engine', 'right', 'best match, picked for you', 3],
+  app: { k: 0.62, pad: { l: 120, r: 660, t: 140, b: 60 }, notes: [
+    ['player', 'top', 'keeps playing while you switch projects', -1.5],
+    ['engine', 'right', 'the engine that sounds most like you', 2],
   ] },
-  takes: { k: 0.8, pad: { l: 400, r: 420, t: 100, b: 90 }, notes: [
-    ['split', 'top', 'one take or paragraph by paragraph', -2],
-    ['pick', 'left', 'pick the best take', -4],
-    ['redo', 'right', 'redo just this line', 3],
-    ['download', 'right', 'grab a single clip', -2],
-    ['export', 'bottom', 'done? export for YouTube', 2],
+  takes: { k: 0.8, pad: { l: 440, r: 440, t: 130, b: 50 }, notes: [
+    ['split', 'top', 'the whole script in one take, or line by line', -1.5],
+    ['pick', 'left', 'compare takes, keep the best', -2],
+    ['redo', 'right', 'redo only this line', 2],
   ] },
-  panel: { k: 0.9, pad: { l: 440, r: 460, t: 40, b: 40 }, notes: [
-    ['best', 'left', 'closest to your voice', -3],
-    ['fast', 'right', 'need it fast? this one', 3],
-    ['styles', 'left', 'one-click styles', -2],
-    ['mood', 'right', 'mic = your own mood clip', 3],
-    ['tone', 'right', 'tone changes instantly', -2],
+  panel: { k: 0.9, pad: { l: 120, r: 560, t: 40, b: 40 }, notes: [
+    ['best', 'right', 'closest match to your voice', 2],
+    ['mood', 'right', 'your own recorded mood = real emotion', -2],
+    ['tone', 'right', 'tone changes instantly, no re-render', 2],
   ] },
-  export: { k: 0.9, pad: { l: 440, r: 460, t: 40, b: 40 }, notes: [
-    ['format', 'right', 'WAV or MP3', 3],
-    ['master', 'right', 'YouTube loudness, done', -3],
-    ['play', 'left', 'listen before uploading', -2],
-    ['srt', 'left', 'subtitles too', 2],
+  export: { k: 0.9, pad: { l: 120, r: 560, t: 40, b: 40 }, notes: [
+    ['master', 'right', 'YouTube loudness, automatically', 2],
+    ['srt', 'right', 'subtitles with word timings', -2],
   ] },
 };
 
@@ -213,7 +206,7 @@ html, body { margin: 0; background: #0b0f0e; }
 #c { position: relative; width: ${W}px; height: ${H}px; overflow: hidden; background: #0b0f0e; }
 #shot { position: absolute; left: ${P.l}px; top: ${P.t}px; width: ${s.w * k}px; height: ${s.h * k}px; border-radius: 12px;
   box-shadow: 0 0 0 1px #28322e, 0 30px 70px rgba(0,0,0,.55); }
-.n { position: absolute; font: 700 44px/1 Caveat, cursive; color: #ffd84d; white-space: nowrap; transform-origin: center; }
+.n { position: absolute; font: 700 50px/1.05 Caveat, cursive; color: #f4f7f5; white-space: nowrap; transform-origin: center; text-shadow: 0 2px 14px rgba(0,0,0,.6); }
 svg { position: absolute; inset: 0; overflow: visible; }
 </style>
 <div id="c"><img id="shot" src="${img}"><svg id="svg" width="${W}" height="${H}"></svg></div>
@@ -221,24 +214,24 @@ svg { position: absolute; inset: 0; overflow: visible; }
 const W = ${W}, H = ${H}, P = ${JSON.stringify(P)}, notes = ${JSON.stringify(notes)};
 const c = document.getElementById('c'), svg = document.getElementById('svg'), NS = 'http://www.w3.org/2000/svg';
 let seed = 7; const rnd = () => ((seed = (seed * 9301 + 49297) % 233280) / 233280 - 0.5);
-const line = (d, w = 3.6) => { const e = document.createElementNS(NS, 'path'); e.setAttribute('d', d); e.setAttribute('fill', 'none');
-  e.setAttribute('stroke', '#ffd84d'); e.setAttribute('stroke-width', w); e.setAttribute('stroke-linecap', 'round'); e.setAttribute('stroke-linejoin', 'round'); svg.appendChild(e); };
+const line = (d, w = 3.2) => { const e = document.createElementNS(NS, 'path'); e.setAttribute('d', d); e.setAttribute('fill', 'none');
+  e.setAttribute('stroke', '#f4f7f5'); e.setAttribute('stroke-width', w); e.setAttribute('stroke-linecap', 'round'); e.setAttribute('stroke-linejoin', 'round'); svg.appendChild(e); };
 function arrow(sx, sy, ex, ey) { // a little hand-drawn arrow: gentle curve, slight wobble, open head
-  const dx = ex - sx, dy = ey - sy, len = Math.hypot(dx, dy), bend = (rnd() > 0 ? 1 : -1) * Math.min(40, len * 0.22);
+  const dx = ex - sx, dy = ey - sy, len = Math.hypot(dx, dy), bend = -Math.min(28, len * 0.18);
   const mx = (sx + ex) / 2 - dy / len * bend, my = (sy + ey) / 2 + dx / len * bend;
-  line('M' + sx + ' ' + sy + ' Q' + (mx + rnd() * 6) + ' ' + (my + rnd() * 6) + ' ' + ex + ' ' + ey);
-  const a = Math.atan2(ey - my, ex - mx), h = 15;
+  line('M' + sx + ' ' + sy + ' Q' + (mx + rnd() * 3) + ' ' + (my + rnd() * 3) + ' ' + ex + ' ' + ey);
+  const a = Math.atan2(ey - my, ex - mx), h = 16;
   for (const s of [-1, 1]) line('M' + ex + ' ' + ey + ' L' + (ex - h * Math.cos(a + s * 0.5) + rnd() * 2) + ' ' + (ey - h * Math.sin(a + s * 0.5) + rnd() * 2));
 }
 for (const n of notes) { const d = document.createElement('div'); d.className = 'n'; d.textContent = n.text; c.appendChild(d); n.el = d; }
 document.fonts.ready.then(() => {
   for (const n of notes) {
-    const room = n.side === 'left' ? P.l - 60 : n.side === 'right' ? P.r - 60 : W;
-    for (let size = 44; n.el.offsetWidth > room && size > 30; size -= 2) n.el.style.fontSize = size + 'px';
+    const room = n.side === 'left' ? P.l - 100 : n.side === 'right' ? P.r - 100 : W - 40;
+    for (let size = 50; n.el.offsetWidth > room && size > 34; size -= 2) n.el.style.fontSize = size + 'px';
     const w = n.el.offsetWidth, h = n.el.offsetHeight, r = n.r, cx = r.x + r.w / 2, cy = r.y + r.h / 2 + n.nudge;
     let x, y, sx, sy, ex, ey;
-    if (n.side === 'left') { x = P.l - 40 - w; y = cy - h / 2; sx = x + w + 8; sy = cy; ex = r.x - 8; ey = r.y + r.h / 2; }
-    if (n.side === 'right') { x = P.l + ${s.w * k} + 40; y = cy - h / 2; sx = x - 8; sy = cy; ex = r.x + r.w + 8; ey = r.y + r.h / 2; }
+    if (n.side === 'left') { x = P.l - 70 - w; y = cy - h / 2; sx = x + w + 8; sy = cy; ex = r.x - 12; ey = r.y + r.h / 2; }
+    if (n.side === 'right') { x = P.l + ${s.w * k} + 70; y = cy - h / 2; sx = x - 8; sy = cy; ex = r.x + r.w + 12; ey = r.y + r.h / 2; }
     if (n.side === 'top') { x = Math.min(Math.max(16, cx - w / 2 - 60), W - 16 - w); y = Math.max(12, P.t - h - 30); sx = x + w * 0.62; sy = y + h + 4; ex = cx; ey = r.y - 8; }
     if (n.side === 'bottom') { x = Math.min(Math.max(16, cx - w / 2 - 80), W - 16 - w); y = H - h - 14; sx = x + w * 0.66; sy = y - 4; ex = cx; ey = r.y + r.h + 8; }
     Object.assign(n.el.style, { left: x + 'px', top: y + 'px', transform: 'rotate(' + n.tilt + 'deg)' });
