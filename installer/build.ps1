@@ -1,6 +1,6 @@
 # Builds installer\dist\VoiceBird-Setup-<version>.exe: stages the app (code, built screen, uv) and runs Inno Setup.
-#   powershell -ExecutionPolicy Bypass -File installer\build.ps1 [-Version 1.0.0]
-param([string]$Version = '1.0.0')
+#   powershell -ExecutionPolicy Bypass -File installer\build.ps1 [-Version 1.0]
+param([string]$Version = '1.0')
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 $Root = Split-Path -Parent $Here
