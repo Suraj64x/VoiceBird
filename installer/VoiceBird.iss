@@ -95,7 +95,7 @@ Type: filesandordirs; Name: "{app}\installer"
 
 [Code]
 var
-  LastProblem: String;
+  Problems: String;
 
 function Engines(): String;
 begin
@@ -151,7 +151,7 @@ begin
     end;
   end
   else if Copy(S, 1, 3) = '!! ' then
-    LastProblem := Copy(S, 4, MaxInt);
+    Problems := Problems + '  - ' + Copy(S, 4, MaxInt) + #13#10;
 end;
 
 procedure RunSetup();
@@ -165,10 +165,13 @@ begin
   WizardForm.StatusLabel.Caption := 'Getting ready';
   WizardForm.FilenameLabel.Caption := 'Downloading Python, the voice engines and their models. The first install can take a while.';
   Params := '-NoProfile -ExecutionPolicy Bypass -File "' + ExpandConstant('{app}\installer\setup.ps1') + '" -Mode install -Engines ' + Engines() + ' -Whisper ' + SpeechModel();
-  if not ExecAndLogOutput('powershell.exe', Params, ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, Code, @OnSetupOutput) or (Code <> 0) then
-    SuppressibleMsgBox('VoiceBird could not finish setting up:' + #13#10#13#10 + LastProblem + #13#10#13#10 +
-      'Check your internet connection, then run "Repair VoiceBird" from the Start menu (or this installer again).' + #13#10 +
-      'Details: ' + ExpandConstant('{app}\logs\setup.log'), mbError, MB_OK, IDOK);
+  Problems := '';
+  if not ExecAndLogOutput('powershell.exe', Params, ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, Code, @OnSetupOutput) then
+    Problems := '  - Setup could not start PowerShell.' + #13#10;
+  if (Code <> 0) or (Problems <> '') then
+    SuppressibleMsgBox('VoiceBird is installed, but some parts need another try:' + #13#10#13#10 + Problems + #13#10 +
+      'Open "Repair VoiceBird" from the Start menu (or run this installer again). It continues where it stopped and keeps everything that already worked.' + #13#10#13#10 +
+      'Details: ' + ExpandConstant('{app}\logs\setup.log'), mbInformation, MB_OK, IDOK);
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);

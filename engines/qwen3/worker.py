@@ -19,7 +19,7 @@ os.environ.setdefault("TQDM_DISABLE", "1")
 import numpy as np
 import torch
 
-from base import lerp, serve
+from base import lerp, serve, model_path
 
 MODEL = "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
 LANGUAGE = "English"  # ponytail: fixed; the app is English-only. Qwen3 also does zh/ja/ko/de/fr/ru/pt/es/it.
@@ -84,14 +84,15 @@ def _gpu_fixes(tts) -> None:
         int(tts.generate_defaults.get("subtalker_top_k", 50)))
 
 
+def fetch() -> str:
+    """The model files (downloaded once, then offline; see base.model_path)."""
+    return model_path(MODEL)
+
+
 def _build(device: str, dtype):
-    from huggingface_hub import snapshot_download
     from qwen_tts import Qwen3TTSModel
 
-    try:
-        path = snapshot_download(MODEL, local_files_only=True)  # offline after the first download
-    except Exception:  # noqa: BLE001
-        path = snapshot_download(MODEL)
+    path = fetch()
     # sdpa: no flash-attn on Windows / GTX 16xx. The bundled speech tokenizer loads with the same device and dtype.
     tts = Qwen3TTSModel.from_pretrained(path, device_map=device, dtype=dtype, attn_implementation="sdpa")
     if device != "cpu":

@@ -5,7 +5,7 @@ the voice sample), so emotion / energy / style / ref_text are ignored."""
 import os
 
 import torch
-from base import lerp, serve
+from base import lerp, serve, model_path
 
 REPO = "samuel-vitorino/sopro-v2-turbo"
 # Flow-matching solver steps for the mel head. Author default is 2 (fastest); 8/16/32 trade speed for similarity.
@@ -14,16 +14,17 @@ tts = None
 _ref = {}  # (path, mtime) -> prepared reference (speaker embedding + prompt tokens + mel); one voice at a time
 
 
+def fetch() -> str:
+    """The model files (downloaded once, then offline; see base.model_path)."""
+    from sopro.hub import ARTIFACT_FILES
+    return model_path(REPO, list(ARTIFACT_FILES))
+
+
 def load():
     global tts
     torch.set_num_threads(int(os.environ.get("VOICECLONER_THREADS", "6")))
-    from huggingface_hub import snapshot_download
     from sopro import SoproTTS
-    from sopro.hub import ARTIFACT_FILES
-    try:  # offline first: no network once the weights are in the local HF cache
-        tts = SoproTTS.from_pretrained(snapshot_download(REPO, allow_patterns=list(ARTIFACT_FILES), local_files_only=True))
-    except Exception:  # noqa: BLE001  (first run, or an incomplete cache: download)
-        tts = SoproTTS.from_pretrained(REPO)
+    tts = SoproTTS.from_pretrained(fetch())
     return {"device": "CPU"}
 
 

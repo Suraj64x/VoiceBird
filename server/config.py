@@ -15,6 +15,8 @@ os.environ.setdefault("HF_HOME", str(MODELS / "hf"))
 os.environ.setdefault("TORCH_HOME", str(MODELS / "torch"))
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+for _k, _v in (("HF_HUB_DOWNLOAD_TIMEOUT", "120"), ("HF_HUB_ETAG_TIMEOUT", "60"), ("HF_HUB_DISABLE_XET", "1")):
+    os.environ.setdefault(_k, _v)  # patient, resumable model downloads
 os.environ["TEMP"] = os.environ["TMP"] = str(TMP)
 
 

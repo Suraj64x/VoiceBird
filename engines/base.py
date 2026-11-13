@@ -24,6 +24,54 @@ import sys
 import traceback
 
 
+def model_path(repo: str, patterns: list | None = None) -> str:
+    """Folder holding a model's files.
+
+    VoiceBird keeps its own plain copy in <HF_HOME>/voicebird/<repo>: real files, no symlinks (some PCs block them).
+    An existing Hugging Face cache is used as it is. Downloads resume where they stopped and retry with a growing pause.
+    With VOICEBIRD_REFRESH=1 (setup and repair) every file of our copy is checked against the Hub again, so broken,
+    incomplete or outdated files are fixed.
+    """
+    import time
+    from pathlib import Path
+    from huggingface_hub import snapshot_download
+    home = Path(os.environ.get("HF_HOME") or Path.home() / ".cache" / "huggingface")
+    own = home / "voicebird" / repo.replace("/", "--")
+    done = own / ".complete"
+    refresh = os.environ.get("VOICEBIRD_REFRESH") == "1"
+    if done.exists() and not refresh:
+        return str(own)
+    if not own.exists():
+        try:  # a model that is already in the regular Hugging Face cache
+            return snapshot_download(repo, allow_patterns=patterns, local_files_only=True)
+        except Exception:  # noqa: BLE001
+            pass
+    if refresh and own.exists():  # repair: a file whose size differs from the Hub's is broken or outdated, fetch it again
+        try:
+            from fnmatch import fnmatch
+            from huggingface_hub import HfApi
+            for f in HfApi().model_info(repo, files_metadata=True).siblings:
+                local = own / f.rfilename
+                wanted = not patterns or any(fnmatch(f.rfilename, p) for p in patterns)
+                if wanted and f.size is not None and local.exists() and local.stat().st_size != f.size:
+                    print(f"{repo}: {f.rfilename} is damaged or outdated, downloading it again", file=sys.stderr, flush=True)
+                    local.unlink()
+        except Exception as e:  # noqa: BLE001  (offline: keep what we have)
+            print(f"could not check the {repo} files: {e}", file=sys.stderr, flush=True)
+    tries, err = int(os.environ.get("VOICEBIRD_TRIES", "6")), None
+    for attempt in range(tries):
+        try:
+            snapshot_download(repo, allow_patterns=patterns, local_dir=own)
+            done.write_text(time.strftime("%Y-%m-%d %H:%M"), encoding="utf-8")
+            return str(own)
+        except Exception as e:  # noqa: BLE001
+            err = e
+            print(f"download of {repo} stopped ({type(e).__name__}: {e}); try {attempt + 1} of {tries}", file=sys.stderr, flush=True)
+            if attempt + 1 < tries:
+                time.sleep(min(60, 5 * 2 ** attempt))
+    raise RuntimeError(f"Could not download the {repo} model: {err}")
+
+
 def serve(load, speak) -> None:
     proto = os.fdopen(os.dup(1), "w", encoding="utf-8")  # the real stdout is reserved for the protocol
     os.dup2(2, 1)                                        # anything a library prints goes to the log instead

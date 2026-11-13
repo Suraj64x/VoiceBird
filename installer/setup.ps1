@@ -28,6 +28,9 @@ $env:UV_LINK_MODE = 'hardlink'; $env:UV_NO_PROGRESS = '1'
 $env:HF_HOME = "$Root\models\hf"; $env:TORCH_HOME = "$Root\models\torch"
 $env:HF_HUB_DISABLE_SYMLINKS_WARNING = '1'; $env:HF_HUB_DISABLE_TELEMETRY = '1'
 $env:TEMP = $env:TMP = "$Root\.cache\tmp"; $env:PYTHONUTF8 = '1'
+# slow or shaky connections: long timeouts, retries, plain resumable HTTP downloads
+$env:UV_HTTP_TIMEOUT = '300'; $env:UV_HTTP_RETRIES = '5'
+$env:HF_HUB_DOWNLOAD_TIMEOUT = '120'; $env:HF_HUB_ETAG_TIMEOUT = '60'; $env:HF_HUB_DISABLE_XET = '1'
 
 $EngineModule = [ordered]@{ 'qwen3' = 'qwen_tts'; 'chatterbox-nano' = 'chatterbox'; 'chatterbox' = 'chatterbox'; 'voxcpm' = 'voxcpm'; 'sopro' = 'sopro' }
 $Fix = $Mode -ne 'verify'
@@ -56,6 +59,13 @@ function Run([string]$exe, [string[]]$a, [string]$what, [switch]$Soft) {
   if ($code -ne 0 -and -not $Soft) { throw "$what failed (code $code). Details: logs\setup.log" }
   return $code
 }
+function Uv([string[]]$a, [string]$what) {
+  for ($try = 1; $try -le 3; $try++) {
+    if ((Run $uv $a $what -Soft) -eq 0) { return }
+    Log "$what failed, try $try of 3"; Start-Sleep -Seconds (10 * $try)
+  }
+  throw "$what failed after 3 tries. Details: logs\setup.log"
+}
 # The Python that uv installed, found by its real folder (not uv's version link, which some PCs block).
 function ManagedPython {
   Get-ChildItem "$RT\python" -Directory -Filter 'cpython-3.11.*-windows-x86_64-none' -ErrorAction SilentlyContinue |
@@ -69,18 +79,31 @@ function Works([string]$exe, [string[]]$a) {
   $ok = $LASTEXITCODE -eq 0; $ErrorActionPreference = $old
   return $ok
 }
+# Size of a file on the server (follows redirects), or 0 when unknown.
+function RemoteSize([string]$url) {
+  $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+  $h = & curl.exe -sIL --connect-timeout 30 $url 2>$null
+  $ErrorActionPreference = $old
+  $len = $h | Select-String -Pattern '^content-length:\s*(\d+)' | Select-Object -Last 1
+  if ($len) { return [int64]$len.Matches[0].Groups[1].Value } else { return [int64]0 }
+}
+# Download with resume (a stopped download continues), retries, stall detection and a size check.
 function Fetch([string]$url, [string]$dest) {
-  Log "download $url"
   $part = "$dest.part"
-  if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
+  $want = RemoteSize $url
+  for ($try = 1; $try -le 5; $try++) {
+    Log "download $url (try $try)"
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    & curl.exe -L --fail --retry 4 --retry-delay 3 -s -S -o $part $url 2>> $LogFile
+    $err = & curl.exe -L --fail --retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 30 `
+      --speed-limit 4096 --speed-time 60 -C - -s -S -o $part $url 2>&1 | Out-String
     $code = $LASTEXITCODE; $ErrorActionPreference = $old
-    if ($code -ne 0) { throw "Download failed: $url (check your internet connection)" }
-  } else {
-    Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $part
+    if ($err.Trim()) { Add-Content -LiteralPath $LogFile -Value "  $($err.Trim())" -Encoding UTF8 }
+    $have = if (Test-Path $part) { (Get-Item $part).Length } else { 0 }
+    if ($code -eq 0 -and ($want -eq 0 -or $have -eq $want)) { Move-Item -Force $part $dest; return }
+    if ($code -in 22, 33, 36 -or ($want -gt 0 -and $have -gt $want)) { Remove-Item $part -ErrorAction SilentlyContinue }  # can't resume: start over
+    Start-Sleep -Seconds (5 * $try)
   }
-  Move-Item -Force $part $dest
+  throw "Download did not finish after 5 tries: $url"
 }
 function Unzip([string]$zip, [string]$to) {
   if (Test-Path $to) { Remove-Item -Recurse -Force $to }
@@ -138,7 +161,7 @@ try {
     if (-not $Fix) { Bad 'The app''s Python packages are missing or broken' } else {
       Say 13 'Installing the app'
       $null = Run $pyExe @('-m', 'venv', '--without-pip', '--clear', "$Root\.venv") 'Creating the app environment'
-      $null = Run $uv @('pip', 'install', '--python', $appPy, '-r', "$Root\requirements.txt") 'Installing the app packages'
+      Uv @('pip', 'install', '--python', $appPy, '-r', "$Root\requirements.txt") 'Installing the app packages'
     }
   }
   if (-not (Test-Path "$Root\ui\dist\index.html")) { Bad 'The app screen (ui\dist) is missing: reinstall VoiceBird' }
@@ -177,11 +200,16 @@ try {
       Remove-Item -Recurse -Force "$RT\whisper-x"
     }
   }
-  $haveModel = Get-ChildItem $wdir -Filter 'ggml-*.en.bin' -ErrorAction SilentlyContinue | Where-Object { $_.Length -gt 50MB }
-  if (-not $haveModel) {
-    if (-not $Fix) { Bad 'The Whisper model is missing' } else {
-      Say 32 "Downloading the speech model ($Whisper)"
-      Fetch "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-$Whisper.en.bin" "$wdir\ggml-$Whisper.en.bin"
+  $model = Get-ChildItem $wdir -Filter 'ggml-*.en.bin' -ErrorAction SilentlyContinue | Sort-Object Length -Descending | Select-Object -First 1
+  if (-not $Fix) { if (-not $model -or $model.Length -lt 50MB) { Bad 'The Whisper model is missing' } }
+  else {
+    $name = if ($model) { $model.Name } else { "ggml-$Whisper.en.bin" }
+    $url = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/$name"
+    $want = RemoteSize $url
+    if (-not $model -or ($want -gt 0 -and $model.Length -ne $want)) {
+      Say 32 "Downloading the speech model ($($name -replace 'ggml-|\.en\.bin',''))"
+      if ($model) { Move-Item -Force $model.FullName "$wdir\$name.part" }  # finish a cut-off copy instead of starting over
+      Fetch $url "$wdir\$name"
     }
   }
 
@@ -192,22 +220,39 @@ try {
     $name = (Get-Content "$Root\engines\$id\engine.json" -Raw | ConvertFrom-Json).name -replace '\s*\(.*\)$', ''
     $epy = "$Root\engines\$id\.venv\Scripts\python.exe"
     Say $base "Checking $name"
-    if (-not (Works $epy @('-c', "import torch, $($EngineModule[$id])"))) {
-      if (-not $Fix) { Bad "$name is not installed or broken"; continue }
+    try {
       $useCuda = $cuda -and $id -ne 'sopro'
-      Say ($base + $span * 0.1) "Installing $name$(if ($useCuda) { ' for your graphics card' } else { '' }) (large download)"
-      $null = Run $pyExe @('-m', 'venv', '--without-pip', '--clear', "$Root\engines\$id\.venv") "Creating the $name environment"
-      $idx = if ($useCuda) { 'https://download.pytorch.org/whl/cu124' } else { 'https://download.pytorch.org/whl/cpu' }
-      $null = Run $uv @('pip', 'install', '--python', $epy, 'torch==2.6.0', 'torchaudio==2.6.0', '--index-url', $idx) "Installing PyTorch for $name"
-      Say ($base + $span * 0.45) "Installing $name packages"
-      $null = Run $uv @('pip', 'install', '--python', $epy, '-r', "$Root\engines\$id\requirements.txt") "Installing $name"
+      if (-not (Works $epy @('-c', "import torch, $($EngineModule[$id])"))) {
+        if (-not $Fix) { Bad "$name is not installed or broken"; continue }
+        Say ($base + $span * 0.05) "Installing $name$(if ($useCuda) { ' for your graphics card' } else { '' }) (large download)"
+        $null = Run $pyExe @('-m', 'venv', '--without-pip', '--clear', "$Root\engines\$id\.venv") "Creating the $name environment"
+      }
+      if (-not $Fix) { continue }
+      # the right PyTorch (graphics card or processor) and every package: quick when all is already fine
+      $have = (& $epy -c "import torch; print('cuda' if torch.version.cuda else 'cpu')" 2> $null | Select-Object -Last 1)
+      $want = if ($useCuda) { 'cuda' } else { 'cpu' }
+      if ($have -ne $want) {
+        Say ($base + $span * 0.1) "Installing PyTorch for $name (large download)"
+        $idx = if ($useCuda) { 'https://download.pytorch.org/whl/cu124' } else { 'https://download.pytorch.org/whl/cpu' }
+        Uv @('pip', 'install', '--python', $epy, 'torch==2.6.0', 'torchaudio==2.6.0', '--index-url', $idx, '--reinstall-package', 'torch', '--reinstall-package', 'torchaudio') "Installing PyTorch for $name"
+      }
+      Say ($base + $span * 0.4) "Checking $name packages"
+      Uv @('pip', 'install', '--python', $epy, '-r', "$Root\engines\$id\requirements.txt") "Installing $name"
+      if ($NoModels) { continue }
+      Say ($base + $span * 0.5) "Downloading the $name voice model (continues if it was cut off)"
+      $env:PYTHONPATH = "$Root\engines;$Root\engines\$id"; $env:VOICEBIRD_REFRESH = '1'
+      try { $null = Run $epy @('-c', 'import worker; print(worker.fetch())') "Downloading the $name model" }
+      finally { $env:VOICEBIRD_REFRESH = '0' }
+      Say ($base + $span * 0.85) "Starting $name once to test it"
+      if ((Run $epy @('-c', 'import worker; worker.load(); print("model ok")') "Starting $name" -Soft) -ne 0) {
+        # downloaded fine but did not start here (for example, not enough graphics memory right now): not fatal
+        $why = (Get-Content $LogFile -Encoding UTF8 | Where-Object { $_ -match 'Error|error:' } | Select-Object -Last 1)
+        Log "WARNING: $name is installed but did not start in setup: $why"
+        Write-Output "@@ $([int]($base + $span * 0.95)) $name is installed (it will start when you use it)"
+      }
     }
-    if ($Fix -and -not $NoModels) {
-      Say ($base + $span * 0.6) "Downloading and testing the $name voice model"
-      $env:PYTHONPATH = "$Root\engines;$Root\engines\$id"
-      $null = Run $epy @('-c', 'import worker; worker.load(); print("model ok")') "Loading the $name model"
-      Remove-Item Env:PYTHONPATH
-    }
+    catch { Bad "$name`: $($_.Exception.Message)" }
+    finally { Remove-Item Env:PYTHONPATH -ErrorAction SilentlyContinue }
   }
 
   # ---------- 7. your data and settings ----------
@@ -249,7 +294,7 @@ print(chr(10).join(bad))
   }
 
   if ($Problems.Count) {
-    Say 100 "Found $($Problems.Count) problem(s). Run Repair VoiceBird to fix them."
+    Say 100 $(if ($Fix) { "Done, but $($Problems.Count) part(s) need another try: run Repair VoiceBird" } else { "Found $($Problems.Count) problem(s). Run Repair VoiceBird to fix them." })
     Done 1
   }
   Say 100 $(if ($Mode -eq 'verify') { 'Everything is healthy' } else { 'VoiceBird is ready' })

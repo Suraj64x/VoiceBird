@@ -13,24 +13,25 @@ os.environ.setdefault("TQDM_DISABLE", "1")  # keep per-step progress bars out of
 import numpy as np
 import torch
 
-from base import serve
+from base import serve, model_path
 
 MODEL = "openbmb/VoxCPM-0.5B"
 _m: dict = {}
 _voice: dict = {}  # the last voice only: {(ref path, mtime, transcript): encoded prompt}
 
 
+def fetch() -> str:
+    """The model files (downloaded once, then offline; see base.model_path)."""
+    return model_path(MODEL, ["*.json", "*.bin", "*.pth"])
+
+
 def _build(device: str, dtype: str):
     import voxcpm.model.voxcpm as vm
-    from huggingface_hub import snapshot_download
     from voxcpm import VoxCPM
 
     # config.json asks for bfloat16 (no GTX 16xx support, and slow on CPU): float16 on the GPU, float32 on CPU.
     vm.pick_runtime_dtype = lambda dev, configured: dtype
-    try:
-        path = snapshot_download(MODEL, local_files_only=True)  # offline after the first download
-    except Exception:  # noqa: BLE001
-        path = snapshot_download(MODEL, allow_patterns=["*.json", "*.bin", "*.pth"])
+    path = fetch()
     # optimize=False: no torch.compile (CUDA + triton only). enable_denoiser=False: no ZipEnhancer / modelscope.
     return VoxCPM(path, enable_denoiser=False, optimize=False, device=device).tts_model
 

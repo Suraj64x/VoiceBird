@@ -12,7 +12,7 @@ os.environ.setdefault("TQDM_DISABLE", "1")  # one progress bar per sentence woul
 import numpy as np
 import torch
 
-from base import lerp, serve
+from base import lerp, serve, model_path
 
 REPO = "ResembleAI/chatterbox-nano"
 # Only what Nano loads; the repo's 1 GB s3gen.safetensors is not used by this model.
@@ -22,14 +22,15 @@ model = None
 voices = {}  # (ref path, mtime) -> Conditionals (speaker embedding + prompt tokens)
 
 
+def fetch() -> str:
+    """The model files (downloaded once, then offline; see base.model_path)."""
+    return model_path(REPO, FILES)
+
+
 def load():
     global model
-    from huggingface_hub import hf_hub_download
     torch.set_num_threads(int(os.environ.get("VOICECLONER_THREADS", "6")))
-    try:  # offline first; the network is only touched on the very first run
-        ckpt = Path([hf_hub_download(REPO, f, local_files_only=True) for f in FILES][-1]).parent
-    except Exception:  # noqa: BLE001
-        ckpt = Path([hf_hub_download(REPO, f) for f in FILES][-1]).parent
+    ckpt = Path(fetch())
     from chatterbox.tts_turbo import ChatterboxTurboTTS
     model = ChatterboxTurboTTS.from_local(ckpt, "cpu", nano=True)
     return {"device": _gpu_setup()}
