@@ -56,7 +56,10 @@ function Run([string]$exe, [string[]]$a, [string]$what, [switch]$Soft) {
   $out = & $exe @a 2>&1 | ForEach-Object { "  $_" }
   $code = $LASTEXITCODE; $ErrorActionPreference = $old
   if ($out) { Add-Content -LiteralPath $LogFile -Value $out -Encoding UTF8 }
-  if ($code -ne 0 -and -not $Soft) { throw "$what failed (code $code). Details: logs\setup.log" }
+  if ($code -ne 0 -and -not $Soft) {
+    $why = @($out | Where-Object { "$_".Trim() } | Select-Object -Last 1) -join ''
+    throw "$what failed$(if ($why) { ': ' + $why.Trim() } else { " (code $code)" }). Details: logs\setup.log"
+  }
   return $code
 }
 function Uv([string[]]$a, [string]$what) {
@@ -78,6 +81,20 @@ function Works([string]$exe, [string[]]$a) {
   & $exe @a *> $null
   $ok = $LASTEXITCODE -eq 0; $ErrorActionPreference = $old
   return $ok
+}
+# What a tool prints; never stops setup (its error text goes to the log).
+function Ask([string]$exe, [string[]]$a) {
+  $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+  $all = & $exe @a 2>&1
+  $ErrorActionPreference = $old
+  foreach ($l in $all) { if ($l -is [Management.Automation.ErrorRecord]) { Log "  $l" } else { $l } }
+}
+# Stop with a clear message before a big download that would not fit (a full disk breaks installs halfway).
+function Room([double]$gb, [string]$what) {
+  try { $d = New-Object IO.DriveInfo ([IO.Path]::GetPathRoot($Root)); $free = $d.AvailableFreeSpace / 1GB } catch { return }
+  if ($free -lt $gb) {
+    throw ('Not enough free space on {0} for {1}: about {2} GB is needed, {3:N1} GB is free. Free some space, then run Repair VoiceBird.' -f $d.Name.TrimEnd('\'), $what, $gb, $free)
+  }
 }
 # Size of a file on the server (follows redirects), or 0 when unknown.
 function RemoteSize([string]$url) {
@@ -170,7 +187,7 @@ try {
   Say 20 'Checking FFmpeg'
   $ff = "$RT\ffmpeg\ffmpeg.exe"
   $ffOk = (Works $ff @('-version'))
-  if ($ffOk) { $ffOk = [bool](& $ff -hide_banner -filters 2> $null | Select-String -SimpleMatch 'rubberband') }
+  if ($ffOk) { $ffOk = [bool](Ask $ff @('-hide_banner', '-filters') | Select-String -SimpleMatch 'rubberband') }
   if (-not $ffOk) {
     if (-not $Fix) { Bad 'FFmpeg is missing' } else {
       Say 21 'Downloading FFmpeg'
@@ -207,6 +224,7 @@ try {
     $url = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/$name"
     $want = RemoteSize $url
     if (-not $model -or ($want -gt 0 -and $model.Length -ne $want)) {
+      Room 2 'the speech model'
       Say 32 "Downloading the speech model ($($name -replace 'ggml-|\.en\.bin',''))"
       if ($model) { Move-Item -Force $model.FullName "$wdir\$name.part" }  # finish a cut-off copy instead of starting over
       Fetch $url "$wdir\$name"
@@ -229,22 +247,27 @@ try {
       }
       if (-not $Fix) { continue }
       # the right PyTorch (graphics card or processor) and every package: quick when all is already fine
-      $have = (& $epy -c "import torch; print('cuda' if torch.version.cuda else 'cpu')" 2> $null | Select-Object -Last 1)
+      $have = Ask $epy @('-c', "import torch; print('cuda' if torch.version.cuda else 'cpu')") | Select-Object -Last 1
       $want = if ($useCuda) { 'cuda' } else { 'cpu' }
       if ($have -ne $want) {
+        # PyTorch is big the first time; later engines reuse the copy that is already downloaded
+        $tag = if ($useCuda) { 'cu124' } else { 'cpu' }
+        $reuse = Test-Path "$Root\engines\*\.venv\Lib\site-packages\torch-2.6.0+$tag.dist-info"
+        Room $(if ($reuse) { 1 } elseif ($useCuda) { 5 } else { 1.5 }) "PyTorch for $name"
         Say ($base + $span * 0.1) "Installing PyTorch for $name (large download)"
         $idx = if ($useCuda) { 'https://download.pytorch.org/whl/cu124' } else { 'https://download.pytorch.org/whl/cpu' }
         Uv @('pip', 'install', '--python', $epy, 'torch==2.6.0', 'torchaudio==2.6.0', '--index-url', $idx, '--reinstall-package', 'torch', '--reinstall-package', 'torchaudio') "Installing PyTorch for $name"
       }
       Say ($base + $span * 0.4) "Checking $name packages"
-      Uv @('pip', 'install', '--python', $epy, '-r', "$Root\engines\$id\requirements.txt") "Installing $name"
+      Room 1 $name
+      Uv @('pip', 'install', '--no-deps', '--python', $epy, '-r', "$Root\engines\$id\requirements.txt") "Installing $name"
       if ($NoModels) { continue }
       Say ($base + $span * 0.5) "Downloading the $name voice model (continues if it was cut off)"
       $env:PYTHONPATH = "$Root\engines;$Root\engines\$id"; $env:VOICEBIRD_REFRESH = '1'
       try { $null = Run $epy @('-c', 'import worker; print(worker.fetch())') "Downloading the $name model" }
       finally { $env:VOICEBIRD_REFRESH = '0' }
       Say ($base + $span * 0.85) "Starting $name once to test it"
-      if ((Run $epy @('-c', 'import worker; worker.load(); print("model ok")') "Starting $name" -Soft) -ne 0) {
+      if ((Run $epy @('-c', "import worker; worker.load(); print('model ok')") "Starting $name" -Soft) -ne 0) {
         # downloaded fine but did not start here (for example, not enough graphics memory right now): not fatal
         $why = (Get-Content $LogFile -Encoding UTF8 | Where-Object { $_ -match 'Error|error:' } | Select-Object -Last 1)
         Log "WARNING: $name is installed but did not start in setup: $why"
@@ -287,7 +310,7 @@ print(chr(10).join(bad))
 '@
     $script = "$Root\.cache\tmp\check_data.py"
     Set-Content -LiteralPath $script -Value $check -Encoding ASCII
-    $out = & $appPy $script $Root $(if ($Fix) { 'fix' } else { 'check' }) 2>> $LogFile
+    $out = Ask $appPy @($script, $Root, $(if ($Fix) { 'fix' } else { 'check' }))
     $broken = @($out | Where-Object { $_ -and $_.Trim() })
     foreach ($b in $broken) { if ($Fix) { Log "moved aside: $b"; Say 97 "Moved an unreadable file aside: $b (kept in .broken\)" } else { Bad "Unreadable file: $b" } }
     Remove-Item $script -ErrorAction SilentlyContinue

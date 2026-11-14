@@ -57,6 +57,9 @@ class _Worker:
         line = self.proc.stdout.readline()
         if not line:
             tail = (ENGINES / self.id / "worker.log").read_text(encoding="utf-8", errors="replace").strip().splitlines()[-1:]
+            if any("ModuleNotFoundError" in x for x in tail):  # a half-finished install
+                return {"ok": False, "ready": False, "error": "This voice engine is not fully installed. Open \"Repair VoiceBird\" "
+                        "from the Start menu, or pick another engine. (" + " ".join(tail) + ")"}
             return {"ok": False, "ready": False, "error": "The voice engine stopped unexpectedly. " + " ".join(tail)}
         return json.loads(line)
 
